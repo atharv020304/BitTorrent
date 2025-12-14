@@ -35,12 +35,10 @@ int main(int argc, char* argv[])
 
         cout << "Torrent parsed successfully\n";
         cout << "---------------------------\n";
-        cout << "Name        : " << meta.name << "\n";
-        cout << "Announce    : " << meta.announce << "\n";
-        cout << "Total size  : " << meta.totalSize << " bytes\n";
-        cout << "Piece len   : " << meta.pieceLength << "\n";
-        cout << "Pieces      : " << meta.pieceHashes.size() << "\n";
-        cout << "Info hash   : " << meta.infoHashHex << "\n";
+        cout << "Name       : " << meta.name << "\n";
+        cout << "Announce   : " << meta.announce << "\n";
+        cout << "Total size : " << meta.length << " bytes\n";
+        cout << "Info hash  : " << meta.info_hash << "\n";
 
     } catch (const exception &e) {
         cerr << "Error: " << e.what() << "\n";
@@ -49,5 +47,3 @@ int main(int argc, char* argv[])
 
     return 0;
 }
-
-
