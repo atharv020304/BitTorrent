@@ -3,7 +3,7 @@
 
 TorrentMeta parseTorrent(const string &path)
 {
-    TorrentMeta t;
+    TorrentMeta  t;
 
     string raw = readFile(path);
     BPtr root = bdecode(raw);
