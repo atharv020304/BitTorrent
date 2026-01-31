@@ -1,7 +1,7 @@
 #include "torrent.hpp"
 #include "sha1.hpp"
 
-TorrentMeta parseTorrent(const string &path)
+TorrentMeta parseTorrent(const string &path )
 {
     TorrentMeta  t;
 
