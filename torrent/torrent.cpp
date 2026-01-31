@@ -12,7 +12,7 @@ TorrentMeta parseTorrent(const string &path )
 
     BPtr infoDict = dict_get(root,"info");
 
-    string encodedInfo = bencode(infoDict);
+    string encodedInfo = bencode(infoDict );
     t.info_hash = sha1(encodedInfo);
 
     t.name = dict_get(infoDict,"name")->s;
