@@ -40,10 +40,6 @@ struct BValue
     explicit BValue(Type t);
 };
 
-/* =========================
-   Public API
-   ========================= */
-
 // Decode bencoded buffer into AST
 BPtr bdecode(const std::string &buf);
 
