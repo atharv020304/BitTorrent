@@ -75,3 +75,106 @@ int createConnection(std::string& ip, const int port)
     close(sock);
     throw std::runtime_error("Connect to" + ip + ":Failed  [Connection timeout] ");
 }
+
+void sendData(const int sock, const std::string& d)
+{
+    int n = d.length();
+    char buff[n];
+    for(int i=0;i<n;i++){
+        buff[i] = d[i];
+    }
+
+    int res = send(sock,buff,n,0);
+    if (res < 0)
+        throw std::runtime_error("Failed to write data to socket " + std::to_string(sock));
+}
+
+std::string receiveData(const int sock, uint32_t bufferSize)
+{
+    std::string r;
+
+    // If buffer size is not provided, read the first 4 bytes
+    // which contain the incoming message length.
+    if (!bufferSize)
+    {
+        struct pollfd fd;
+        int ret;
+        fd.fd = sock;
+        fd.events = POLLIN;
+
+        ret = poll(&fd, 1, 3000);
+
+        long bytesRead = 0;
+        const int lenIndSize = 4;
+        char buff[lenIndSize];
+
+        switch (ret)
+        {
+            case -1:
+                throw std::runtime_error("Read failed from socket");
+
+            case 0:
+                throw std::runtime_error("Read failed from timeout");
+
+            default:
+                bytesRead = recv(sock, buff, sizeof(buff), 0);
+                break;
+        }
+
+        // Length indicator must be exactly 4 bytes.
+        if (bytesRead != lenIndSize)
+            return r;
+
+        // Convert received length bytes into message size.
+        std::string messageLenStr;
+        for (char i : buff)
+            messageLenStr += i;
+
+        uint32_t messageLength = bytesToInt(messageLenStr);
+        bufferSize = messageLength;
+    }
+
+    // Reject invalid message sizes larger than supported limit.
+    if (bufferSize > std::numeric_limits<uint16_t>::max())
+        throw std::runtime_error(
+            "Received corrupted data [Received buffer size greater than 2 ^ 16 - 1]");
+
+    char buffer[bufferSize];
+
+    long bytesRead = 0;
+    long bytesToRead = bufferSize;
+
+    auto startTime = std::chrono::steady_clock::now();
+
+    do
+    {
+        // Abort if overall receive operation exceeds timeout.
+        auto diff = std::chrono::steady_clock::now() - startTime;
+        if (std::chrono::duration<double, std::milli>(diff).count() > TIMEOUT_FOR_READ)
+        {
+            throw std::runtime_error(
+                "Read timeout from socket " + std::to_string(sock));
+        }
+
+        // Read only the remaining bytes still expected.
+        bytesRead = recv(
+            sock,
+            buffer + (bufferSize - bytesToRead),
+            bytesToRead,
+            0);
+
+        if (bytesRead <= 0)
+        {
+            throw std::runtime_error(
+                "Failed to receive data from socket " + std::to_string(sock));
+        }
+
+        bytesToRead -= bytesRead;
+    }
+    while (bytesToRead > 0);
+
+    // Build response string from the fully received buffer.
+    r.assign(buffer, bufferSize);
+
+    return r;
+}
