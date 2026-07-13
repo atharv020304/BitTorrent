@@ -21,5 +21,8 @@ class Piece
         bool isComplete();
         bool isMatchingHash();
         ~Piece();
+        void reset();
 
 }
+
+#endif

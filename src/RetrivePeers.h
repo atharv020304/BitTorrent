@@ -20,7 +20,7 @@ class PeerRetriever
 
         int port;
         const unsigned long fileSize;
-        std::vector<Peer*> resp(std::string response);
+        std::vector<Peer*> decodeResp(std::string response);
     public:
         explicit PeerFetcher(std::string peerId, std::string announceUrl, std::string infoHash, int port, unsigned long fileSize);
         std::vector<Peer*> retrivePeers(unsigned long bytesDnld = 0);
