@@ -83,3 +83,99 @@ std::vector<Piece*> PieceManager::initPieces()
     return torrentPieces;
 }
 
+bool PieceManager::isComplete() {
+    lock.lock();
+    bool isComplete = havePieces.size() == totalPieces;
+    lock.unlock();
+    return isComplete;
+}
+
+void PieceManager::addPeer(const std::string& peerId, std::string bitField)
+{
+    lock.lock();
+    peers[peerId] = bitField;
+    lock.unlock();
+    std::stringstream info;
+    info << "Number of connections: " <<  std::to_string(peers.size()) << "/" + std::to_string(maxConnections);
+    SPDLOG_INFO("%s", info.str().c_str());
+}
+
+void PieceManager::updatePeer(const std::string& peerId, int index)
+{
+    lock.lock();
+    if (peers.find(peerId) != peers.end())
+    {
+        setPiece(peers[peerId], index);
+        lock.unlock();
+    }else{
+        lock.unlock();
+        throw std::runtime_error("Connection has not been established with peer " + peerId);
+    }
+}
+
+void PieceManager::removePeer(const std::string& peerId)
+{
+    if(isComplete())
+        return;
+    lock.lock();
+    auto iter = peers.find(peerId);
+    if (iter != peers.end())
+    {
+        peers.erase(iter);
+        lock.unlock();
+       std::stringstream info;
+        info << "Number of connections: " <<
+             std::to_string(peers.size()) << "/" + std::to_string(maxConnections);
+        SPDLOG_INFO("%s", info.str().c_str()); 
+}
+}
+
+
+Block* PieceManager::nextRequest(std::string peerId)
+{
+    //return next block that should be requested from the given peer.
+
+    lock.lock();
+    if (missingPieces.empty())
+    {
+        lock.unlock();
+        return nullptr;
+    }
+
+    if(peers.find(peerId) == peers.end())
+    {
+        lock.unlock();
+        return nullptr;
+    }
+
+    Block* block = expiredRequest(peerId);
+    if(!block)
+    {
+        block = nextOngoing(peerId);
+        if(!block)
+            block = getRarestPiece(peerId)->nextRequest();
+    }
+
+    lock.unlock();
+
+    return block;
+}
+
+Block* PieceManager::expiredRequest(std::string peerId)
+{
+    time_t currentTime = std::time(nullptr);
+    for (pRequest* pending : pendingReqs)
+    {
+        if (hasPiece(peers[peerId], pending->block->piece))
+        {
+            auto diff = std::difftime(currentTime, pending->timestamp);
+            if(diff >= MAX_PENDING_TIME)
+            {
+                pending->timestamp = currentTime;
+                SPDLOG_INFO("Block %d from piece %d has expired", pending->block->offset, pending->block->piece);
+                return pending->block;
+            }
+        }
+    }
+    return nullptr;
+}

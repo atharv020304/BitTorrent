@@ -38,7 +38,7 @@ private:
     // lock to prevent race conds
     std::mutex lock;
 
-    std::vector<Piece> initPieces();
+    std::vector<Piece*> initPieces();
     Block *expiredRequest(std::string peerId);
     Block *nextOngoing(std::string peerId);
     Piece *getRarestPiece(std::string peerId);
@@ -56,6 +56,6 @@ public:
     void updatePeer(const std::string &peerId, int index);
     unsigned long bytesDownloaded();
     Block *nextRequest(std::string peerId);
-}
+};
 
 #endif /**/
