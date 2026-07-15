@@ -179,3 +179,58 @@ Block* PieceManager::expiredRequest(std::string peerId)
     }
     return nullptr;
 }
+
+Block* PieceManager::nextOngoing(std::string peerId)
+{
+    for(Piece* piece : ongoingPieces)
+    {
+        if(hasPiece(peers[peerId], piece->index))
+        {
+            Block* block = piece->nextReq();
+            if(block)
+            {
+                auto currentTime = std::time(nullptr);
+                auto newPendingRequest = new pRequest;
+                newPendingRequest->block = block;
+                newPendingRequest->timestamp = std::time(nullptr);
+                pendingReqs.push_back(newPendingRequest);
+                return block;
+            }
+        }
+    }
+    return nullptr;
+}
+
+Piece* PieceManager::getRarestPiece(std::string peerId)
+{
+    
+    auto comp = [](const Piece* a, const Piece* b) { return a->index < b->index; };
+    std::map<Piece*, int, decltype(comp)> pieceCount(comp);
+    for (Piece* piece : missingPieces)
+    {
+       
+        if (peers.find(peerId) != peers.end())
+        {
+            if (hasPiece(peers[peerId], piece->index))
+                pieceCount[piece] += 1;
+        }
+    }
+
+    Piece* rarest;
+    int leastCount = INT16_MAX;
+    for (auto const& [piece, count] : pieceCount)
+    {
+        if (count < leastCount)
+        {
+            leastCount = count;
+            rarest = piece;
+        }
+    }
+
+    missingPieces.erase(
+            std::remove(missingPieces.begin(), missingPieces.end(), rarest),
+            missingPieces.end()
+    );
+    ongoingPieces.push_back(rarest);
+    return rarest;
+}
