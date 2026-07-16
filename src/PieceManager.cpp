@@ -234,3 +234,10 @@ Piece* PieceManager::getRarestPiece(std::string peerId)
     ongoingPieces.push_back(rarest);
     return rarest;
 }
+
+void PieceManager::write(Piece* piece)
+{
+    long position = piece->index * fileParser.getPieceLength();
+    downloadedFile.seekp(position);
+    downloadedFile << piece->getData();
+}
