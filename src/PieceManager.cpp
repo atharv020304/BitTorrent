@@ -323,3 +323,44 @@ void PieceManager::trackProgress()
         usleep(PROGRESS_DISPLAY_INTERVAL * pow(10,6));
     }
 }
+
+void PieceManager::displayProgressBar()
+{
+    std::stringstream info;
+    lock.lock();
+    unsigned long downloadedPieces = havePieces.size();
+    unsigned long downloadedLength = pieceLength * piecesDownloadedInInterval;
+
+    double avgDownloadSpeed = (double) downloadedLength / (double) PROGRESS_DISPLAY_INTERVAL;
+    double avgDownloadSpeedInMBS = avgDownloadSpeed / pow(10, 6);
+
+    info << "[Peers: " + std::to_string(peers.size()) + "/" + std::to_string(maximumConnections) + ", ";
+    info << std::fixed << std::setprecision(2) << avgDownloadSpeedInMBS << " MB/s, ";
+
+    double timePerPiece = (double) PROGRESS_DISPLAY_INTERVAL / (double) piecesDownloadedInInterval;
+    long remainingTime = ceil(timePerPiece * (totalPieces - downloadedPieces));
+    info << "ETA: " << formatTime(remainingTime) << "]";
+
+    double progress = (double) downloadedPieces / (double) totalPieces;
+    int pos = PROGRESS_BAR_WIDTH * progress;
+    info << "[";
+    for (int i = 0; i < PROGRESS_BAR_WIDTH; i++)
+    {
+        if (i < pos) info << "=";
+        else if (i == pos) info << ">";
+        else info << " ";
+    }
+    info << "] ";
+    info << std::to_string(downloadedPieces) + "/" + std::to_string(totalPieces) + " ";
+    info << "[" << std::fixed << std::setprecision(2) << (progress * 100) << "%] ";
+
+    time_t currentTime = std::time(nullptr);
+    long timeSinceStart = floor(std::difftime(currentTime, startingTime));
+
+    info << "in " << formatTime(timeSinceStart);
+    std::cout << info.str() << "\r";
+    std::cout.flush();
+    lock.unlock();
+    if (isComplete())
+        std::cout << std::endl;
+}
