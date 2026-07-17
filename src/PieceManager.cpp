@@ -238,6 +238,88 @@ Piece* PieceManager::getRarestPiece(std::string peerId)
 void PieceManager::write(Piece* piece)
 {
     long position = piece->index * fileParser.getPieceLength();
-    downloadedFile.seekp(position);
+    downloadedFile.seekp(position); //move to the correct position in filestream and save the piece inside disks
     downloadedFile << piece->getData();
+}
+
+void PieceManager::blockReceived(std::string peerId, int pieceindex, int blockOffset, std::string data)
+{
+    SPDLOG_INFO("Recieved block %d for piece %d from peer %s",blockOffset, pieceindex, peerId.c_str());
+
+    pRequest* requestToRemove = nullptr;
+    lock.lock();
+    for (pRequest* pending : pendingReqs)
+    {
+        if(pending->block->piece == pieceindex && pending->block->offset == blockOffset)
+        {
+            requestToRemove = pending;
+            break;
+        }
+    }
+
+    pendingReqs.erase(
+        std::remove(pendingReqs.begin(),pendingReqs.end(), requestToRemove),
+        pendingReqs.end()
+    );
+
+    // retrive the target piece
+    Piece* targetPiece = nullptr;
+    for(Piece* p : ongoingPieces)
+    {
+        if (p->index == pieceindex)
+        {
+            targetPiece = p;
+            break;
+        }
+    }
+
+    lock.unlock();
+    if(!targetPiece)
+        throw std::runtime_error("wrong block recieved");
+    
+    targetPiece->blockReceived(blockOffset, std::move(data));
+    if(targetPiece->isComplete())
+    {
+        if(targetPiece->isMatchingHash())
+        {   
+            // check hash matches, write it to desk
+            write(targetPiece);
+            lock.lock();
+            //remove the piece from ongoing list
+            ongoingPieces.erase(std::remove(ongoingPieces.begin(), ongoingPieces.end(),targetPiece),ongoingPieces.end());
+
+            havePieces.push_back(targetPiece);
+            piecesDownloadedInInterval++;
+            lock.unlock();
+
+            std::stringstream info;
+            info << "(" << std::fixed << std::setprecision(2) << (((float) havePieces.size()) / (float) totalPieces * 100) << "%) ";
+            info << std::to_string(havePieces.size() + " / " + std::to_string(totalPieces) + "Pieces downloaded...";
+            SPDLOG_INFO("%s", info.str().c_str());
+
+        }else
+        {
+            targetPiece->reset();
+            SPDLOG_INFO("Hash mismatch for Piece %d", targetPiece->index);
+        }
+    }
+}
+
+unsigned long PieceManager::bytesDownloaded()
+{
+    lock.lock();
+    unsigned long bytesDownloaded = havePieces.size() * pieceLength;
+    lock.unlock();
+    return bytesDownloaded;
+}
+
+void PieceManager::trackProgress()
+{
+    usleep(pow(10, 6));
+    while (!isComplete())
+    {
+        displayProgressBar();
+        piecesDownloadedInInterval = 0;
+        usleep(PROGRESS_DISPLAY_INTERVAL * pow(10,6));
+    }
 }
