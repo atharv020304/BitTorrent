@@ -34,6 +34,66 @@ void PeerConnection::start()
     SPDLOG_INFO("Downloading thread started...");
     while(!(terminated || pieceManager->isComplete()))
     {
+        p = queue->pop_front();
 
+        if(p->ip == DUMMY_PEER_IP)
+            return;
+        
+        try
+        {
+            if(establishNewConnection()){
+                while(!pieceManager->isComplete())
+                {
+                    BitTorrentMessage message = receiveMessage();
+                    if (message.getMessageId() > 10)
+                        throw std::runtime_error("invalid msg");
+                    switch(message.getMessageId())
+                    {
+                        case choke:
+                            chocked = true;
+                            break;
+
+                        case unchoke:
+                            chocked = false;
+                            break;
+                        
+                        case piece:
+                        {
+                            requestPending = false;
+                            std::string payload = message.getPayload();
+                            int index = bytesToInt(payload.substr(0,4));
+                            int begin = bytesToInt(payload.substr(4,4));
+                            std::string blockData = payload.substr(8);
+                            pieceManager->blockReceived(peerId, index, begin, blockData);
+                            break;
+                        }
+                        case have:
+                        {
+                            std::string payload = message.getPayload();
+                            int pieceIndex = bytesToInt(payload);
+                            pieceManager->updatePeer(peerId, pieceIndex);
+                            break;
+                        }
+
+                        default:
+                            break;
+                    }
+
+                    if(!choked)
+                    {
+                        if(!requestPending)
+                        {
+                            requestPiece();
+                        }
+                    }
+                }
+            }
+        }
+        catch(const std::exception& e)
+        {   
+            closeSock();
+            std::cerr << e.what() << '\n';
+        }
+        
     }
 }
