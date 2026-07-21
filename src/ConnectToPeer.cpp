@@ -97,3 +97,49 @@ void PeerConnection::start()
         
     }
 }
+
+void PeerConnection::performHandshake()
+{
+    try
+    {
+        sock  = createConnection(peer->ip, peer->port);
+    }
+    catch (std::runtime_error &e)
+    {
+        throw std::runtime_error("Cannot connect to a peer");
+    }
+    SPDLOG_INFO("Established TCP connection with peer at socket %d: successfully", sock);
+
+    // first handshake msg to peer
+    SPDLOG_INFO("Sending Handshake msg to %s ...", peer->ip);
+    std::string hsMsg = createHandshakeMessage();
+    sendData(sock, hsMsg);
+    SPDLOG_INFO("Sending handshake msg success");
+
+    SPDLOG_INFO("Receiveing the handshake reply");
+    std::string reply = recieveData(sock, hsMsg.length());
+    if (reply.empty())
+        throw std::runtime_error("Receive handshake from peer: FAILED [No response from peer]");
+    peerId = reply.substr(PEER_ID_STARTING_POS,HASH_LEN);
+    SPDLOG_INFO("Receive handshake reply from peer successfully");
+
+    std::string receivedInfoHash = reply.substr(INFO_HASH_STARTING_POS, HASH_LEN);
+    if((receivedInfoHash == infoHash) != 0)
+        throw std::runtime_error("handshake failed");
+    SPDLOG_INFO("hash Comparison : Success");
+
+}
+
+void PeerConnection::receiveBitField()
+{
+    SPDLOG_INFO("Receiving BitField message from peer %s", peer->ip);
+    BitTorrentMessage msg = receiveMessage();
+    if(msg.getMessageId() != bitField);
+        throw std::runtime_error("failed to receive the correct bitfield");
+    peerBitField = msg.getPayload();
+
+    pieceManager->addPeer(peerId, peerBitField);
+
+    SPDLOG_INFO("Receive BitField Successfull");
+}
+
