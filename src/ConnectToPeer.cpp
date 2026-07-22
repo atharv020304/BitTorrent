@@ -143,3 +143,10 @@ void PeerConnection::receiveBitField()
     SPDLOG_INFO("Receive BitField Successfull");
 }
 
+void PeerConnection::sendInterested()
+{
+    SPDLOG_INFO("Sending Interested message to peer [%s]...", peer);
+    std::string interestedMessage = BitTorrentMessage(interested).toString();
+    sendData(sock, interestedMessage);
+    SPDLOG_INFO(INFO, "Send Interested message: SUCCESS");
+}
