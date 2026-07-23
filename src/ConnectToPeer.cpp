@@ -150,3 +150,14 @@ void PeerConnection::sendInterested()
     sendData(sock, interestedMessage);
     SPDLOG_INFO(INFO, "Send Interested message: SUCCESS");
 }
+
+void PeerConnection::receiveUnchoke() {
+    SPDLOG_INFO("Receiving Unchoke message from peer [%s]...", peer->ip);
+    BitTorrentMessage message = receiveMessage();
+    if (message.getMessageId() != unchoke)
+        throw std::runtime_error(
+                "Receive Unchoke message from peer: FAILED [Wrong message ID: " +
+                std::to_string(message.getMessageId()) + "]");
+    choked = false;
+    SPDLOG_INFO("Receive Unchoke message: SUCCESS");
+}
