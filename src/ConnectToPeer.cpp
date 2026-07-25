@@ -161,3 +161,101 @@ void PeerConnection::receiveUnchoke() {
     choked = false;
     SPDLOG_INFO("Receive Unchoke message: SUCCESS");
 }
+
+void PeerConnection::requestPiece() 
+{
+    Block* block = pieceManager->nextRequest(peerId);
+
+    if(!block)
+        return;
+    
+    int payloadLength = 12;
+    char temp[payloadLength];
+
+    //little indian to big indian conversion
+    uint32_t index = htonl(block->piece);
+    uint32_t offset = htonl(block->offset);
+    uint32_t length = htonl(block->length);
+    std::memcpy(temp,&index,sizeof(int));
+    std::memcpy(temp+4, &offset, sizeof(int));
+    std::memcpy(temp+8, &length, sizeof(int));
+    std::string payload;
+    for (int i=0;i < payloadLength; i++)
+    {
+        payload += (char) temp[i];
+    }
+    std::stringstream info;
+    info << "Sending Request message to peer " << peer->ip << " ";
+    info << "[Piece: " << std::to_string(block->piece) << " ";
+    info << "Offset: " << std::to_string(block->offset) << " ";
+    info << "Length: " << std::to_string(block->length) << "]";
+    SPDLOG_INFO("%s", info.str());
+    std::string reqMsg = BitTorrentMessage(request, payload).toString();
+    sendData(sock, reqMsg);
+    requestPending = true;
+    SPDLOG_INFO("Send req success");
+
+}
+
+bool PeerConnection::establishNewConnection()
+{
+    try{
+        performHandshake();
+        receiveBitField();
+        sendInterested();
+        return true;
+    }
+    catch( const std::runtime_error* e)
+    {
+        SPDLOG_INFO("An error occured while connecting with peer [%s]", peer->ip);
+        return false;
+    }
+}
+
+std::string PeerConnection::createHandshakeMessage()
+{
+    const std::string protocol = "BitTorrent";
+    std::stringstream buffer;
+    buffer << (char) protocol.length();
+    buffer << protocol;
+    std::string reserved;
+    for (int i=0;i< 8; i++)
+    {
+        reserved.push_back('\0');
+    }
+    buffer << reserved;
+    buffer << hexDecode(infoHash);
+    buffer << clientId;
+    assert (buffer.str().length() == protocol.length() + 49);
+    return buffer.str();
+}
+
+BitTorrentMessage PeerConnection::receiveMessage(int bufferSize) const{
+    std::string reply = receiveData(sock, 0);
+    if(reply.empty())
+        return BitTorrentMessage(keepAlive);
+    auto messageId = (uint8_t) reply[0];
+    std::string payload = reply.substr(1);
+    SPDLOG_INFO("Received message with ID %d from peer [%s]", messageId, peer->ip)
+    return BitTorrentMessage(messageId, payload);
+}
+
+const std::string &PeerConnection::getPeerId() const {
+    return peerId;
+}
+
+void PeerConnection::closeSock()
+{
+    if(sock)
+    {
+        SPDLOG_INFO("Closed connection at socket %d", sock);
+        close(sock);
+        sock ={};
+        requestPending = false;
+        if(!peerBitField.empty())
+        {
+            peerBitField.clear();
+            pieceManager->removePeer(peerId);
+        }
+    }
+}
