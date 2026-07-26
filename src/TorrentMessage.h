@@ -1,9 +1,18 @@
+/**
+ * @file TorrentMessage.h
+ * @brief BitTorrent peer wire protocol message framing.
+ */
+
 #ifndef TORRENTMESSAGE_H
 #define TORRENTMESSAGE_H
 
 #include <cstdint>
 #include <string>
 
+/**
+ * @enum messageID
+ * @brief Standard BitTorrent peer message identifiers.
+ */
 enum messageID
 {
     choke = 0,
@@ -18,6 +27,10 @@ enum messageID
     keepAlive = 255
 };
 
+/**
+ * @class TorrentMessage
+ * @brief Length-prefixed peer message with optional payload.
+ */
 class TorrentMessage
 {
     private:

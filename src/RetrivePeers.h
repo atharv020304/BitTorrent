@@ -1,3 +1,8 @@
+/**
+ * @file RetrivePeers.h
+ * @brief Tracker communication and peer discovery.
+ */
+
 #ifndef TORRENT_PEER_RETRIVER_H
 #define TORRENT_PEER_RETRIVER_H
 
@@ -6,12 +11,20 @@
 #include <cpr/cpr.h>
 
 
+/**
+ * @struct Peer
+ * @brief Endpoint returned by a BitTorrent tracker.
+ */
 struct Peer
 {
     std::string ip;
     int port;
 };
 
+/**
+ * @class PeerRetriever
+ * @brief Queries the announce URL and decodes compact or dictionary peer lists.
+ */
 class PeerRetriever
 {
     private:    

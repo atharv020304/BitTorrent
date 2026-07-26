@@ -1,3 +1,8 @@
+/**
+ * @file Client.h
+ * @brief Top-level client that coordinates tracker queries, peer workers, and piece assembly.
+ */
+
 #ifndef TORRENT_CLIENT_H
 #define TORRENT_CLIENT_H
 
@@ -11,6 +16,13 @@
 #include "ConnectToPeer.h"
 #include "SharedQueue.h"
 
+/**
+ * @class TorrentClient
+ * @brief Orchestrates a multi-threaded BitTorrent download.
+ *
+ * Creates worker threads (@ref PeerConnection), periodically fetches peers from
+ * the tracker (@ref PeerRetriever), and delegates piece scheduling to @ref PieceManager.
+ */
 class TorrentClient
 {
     private:

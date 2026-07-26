@@ -1,13 +1,22 @@
+/**
+ * @file TorrentFileParser.h
+ * @brief Parses `.torrent` metadata using the bencode library.
+ */
+
 #ifndef TORRENTFILEPARSER_H
 #define TORRENTFILEPARSER_H
 
-#include<bits/stdc++.h>
+#include <memory>
+#include <string>
+#include <vector>
 #include <bencode/BDictionary.h>
 
 using byte = unsigned char;
 
-//class used to parse the given torrent file using bencode library.
-
+/**
+ * @class TorrentFileParser
+ * @brief Loads torrent metadata and exposes announce URL, info hash, and piece hashes.
+ */
 class TorrentFileParser
 {
     private: 

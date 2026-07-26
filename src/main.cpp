@@ -1,3 +1,9 @@
+/**
+ * @file main.cpp
+ * @brief CLI entry point for the BitTorrent client.
+ *
+ * Parses command-line options and starts a @ref TorrentClient download session.
+ */
 #include <iostream>
 #include <bitset>
 #include <map>
