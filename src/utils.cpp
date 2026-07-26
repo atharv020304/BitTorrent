@@ -59,11 +59,11 @@ bool hasPiece(const std::string& bitField, int index){
     return (bitField[byteIndex] >> (7 - offset)& 1) != 0;
 }
 
-bool setPiece(std::string& bitField, int index)
+void setPiece(std::string& bitField, int index)
 {
     int byteIndex = floor(index / 8);
     int ofst = index % 8;
-    bitField[byteIndex] |= ( 1 << ( 7 - ofst));  //mark a peice as downloaded by setting the bit as 1
+    bitField[byteIndex] |= ( 1 << ( 7 - ofst));
 }
 
 

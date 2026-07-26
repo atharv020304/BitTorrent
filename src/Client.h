@@ -3,8 +3,12 @@
 
 
 #include <string>
-#include "PeerRetriever.h"
-#include "PeerConnection.h"
+#include <vector>
+#include <thread>
+#include <memory>
+#include <spdlog/spdlog.h>
+#include "RetrivePeers.h"
+#include "ConnectToPeer.h"
 #include "SharedQueue.h"
 
 class TorrentClient
@@ -15,6 +19,7 @@ class TorrentClient
         SharedQueue<Peer*> queue;
         std::vector<std::thread> threadPool;
         std::vector<PeerConnection*> connections;
+        std::shared_ptr<spdlog::logger> logger;
     public:
     explicit TorrentClient(int threadNum = 5, bool enableLogging = true, std::string logFilePath = "logs/client.log");
     ~TorrentClient();

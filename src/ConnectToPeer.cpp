@@ -8,7 +8,7 @@
 #include <spdlog/spdlog.h>
 #include <utility>
 
-#include "PeerConnection.h"
+#include "ConnectToPeer.h"
 #include "utils.h"
 #include "connect.h"
 
@@ -34,9 +34,9 @@ void PeerConnection::start()
     SPDLOG_INFO("Downloading thread started...");
     while(!(terminated || pieceManager->isComplete()))
     {
-        p = queue->pop_front();
+        peer = queue->pop_front();
 
-        if(p->ip == DUMMY_PEER_IP)
+        if(peer->ip == DUMMY_PEER_IP)
             return;
         
         try
@@ -44,17 +44,17 @@ void PeerConnection::start()
             if(establishNewConnection()){
                 while(!pieceManager->isComplete())
                 {
-                    BitTorrentMessage message = receiveMessage();
+                    TorrentMessage message = receiveMessage();
                     if (message.getMessageId() > 10)
                         throw std::runtime_error("invalid msg");
                     switch(message.getMessageId())
                     {
                         case choke:
-                            chocked = true;
+                            choked = true;
                             break;
 
                         case unchoke:
-                            chocked = false;
+                            choked = false;
                             break;
                         
                         case piece:
@@ -110,21 +110,20 @@ void PeerConnection::performHandshake()
     }
     SPDLOG_INFO("Established TCP connection with peer at socket %d: successfully", sock);
 
-    // first handshake msg to peer
-    SPDLOG_INFO("Sending Handshake msg to %s ...", peer->ip);
+    SPDLOG_INFO("Sending Handshake msg to %s ...", peer->ip.c_str());
     std::string hsMsg = createHandshakeMessage();
     sendData(sock, hsMsg);
     SPDLOG_INFO("Sending handshake msg success");
 
-    SPDLOG_INFO("Receiveing the handshake reply");
-    std::string reply = recieveData(sock, hsMsg.length());
+    SPDLOG_INFO("Receiving the handshake reply");
+    std::string reply = receiveData(sock, hsMsg.length());
     if (reply.empty())
         throw std::runtime_error("Receive handshake from peer: FAILED [No response from peer]");
     peerId = reply.substr(PEER_ID_STARTING_POS,HASH_LEN);
     SPDLOG_INFO("Receive handshake reply from peer successfully");
 
     std::string receivedInfoHash = reply.substr(INFO_HASH_STARTING_POS, HASH_LEN);
-    if((receivedInfoHash == infoHash) != 0)
+    if(receivedInfoHash != hexDecode(infoHash))
         throw std::runtime_error("handshake failed");
     SPDLOG_INFO("hash Comparison : Success");
 
@@ -132,9 +131,9 @@ void PeerConnection::performHandshake()
 
 void PeerConnection::receiveBitField()
 {
-    SPDLOG_INFO("Receiving BitField message from peer %s", peer->ip);
-    BitTorrentMessage msg = receiveMessage();
-    if(msg.getMessageId() != bitField);
+    SPDLOG_INFO("Receiving BitField message from peer %s", peer->ip.c_str());
+    TorrentMessage msg = receiveMessage();
+    if(msg.getMessageId() != bitField)
         throw std::runtime_error("failed to receive the correct bitfield");
     peerBitField = msg.getPayload();
 
@@ -145,15 +144,15 @@ void PeerConnection::receiveBitField()
 
 void PeerConnection::sendInterested()
 {
-    SPDLOG_INFO("Sending Interested message to peer [%s]...", peer);
-    std::string interestedMessage = BitTorrentMessage(interested).toString();
+    SPDLOG_INFO("Sending Interested message to peer [%s]...", peer->ip.c_str());
+    std::string interestedMessage = TorrentMessage(interested).toString();
     sendData(sock, interestedMessage);
-    SPDLOG_INFO(INFO, "Send Interested message: SUCCESS");
+    SPDLOG_INFO("Send Interested message: SUCCESS");
 }
 
 void PeerConnection::receiveUnchoke() {
-    SPDLOG_INFO("Receiving Unchoke message from peer [%s]...", peer->ip);
-    BitTorrentMessage message = receiveMessage();
+    SPDLOG_INFO("Receiving Unchoke message from peer [%s]...", peer->ip.c_str());
+    TorrentMessage message = receiveMessage();
     if (message.getMessageId() != unchoke)
         throw std::runtime_error(
                 "Receive Unchoke message from peer: FAILED [Wrong message ID: " +
@@ -172,7 +171,6 @@ void PeerConnection::requestPiece()
     int payloadLength = 12;
     char temp[payloadLength];
 
-    //little indian to big indian conversion
     uint32_t index = htonl(block->piece);
     uint32_t offset = htonl(block->offset);
     uint32_t length = htonl(block->length);
@@ -189,8 +187,8 @@ void PeerConnection::requestPiece()
     info << "[Piece: " << std::to_string(block->piece) << " ";
     info << "Offset: " << std::to_string(block->offset) << " ";
     info << "Length: " << std::to_string(block->length) << "]";
-    SPDLOG_INFO("%s", info.str());
-    std::string reqMsg = BitTorrentMessage(request, payload).toString();
+    SPDLOG_INFO("%s", info.str().c_str());
+    std::string reqMsg = TorrentMessage(request, payload).toString();
     sendData(sock, reqMsg);
     requestPending = true;
     SPDLOG_INFO("Send req success");
@@ -205,9 +203,9 @@ bool PeerConnection::establishNewConnection()
         sendInterested();
         return true;
     }
-    catch( const std::runtime_error* e)
+    catch( const std::runtime_error& e)
     {
-        SPDLOG_INFO("An error occured while connecting with peer [%s]", peer->ip);
+        SPDLOG_INFO("An error occured while connecting with peer [%s]", peer->ip.c_str());
         return false;
     }
 }
@@ -230,14 +228,14 @@ std::string PeerConnection::createHandshakeMessage()
     return buffer.str();
 }
 
-BitTorrentMessage PeerConnection::receiveMessage(int bufferSize) const{
-    std::string reply = receiveData(sock, 0);
+TorrentMessage PeerConnection::receiveMessage(int bufferSize) const{
+    std::string reply = receiveData(sock, bufferSize);
     if(reply.empty())
-        return BitTorrentMessage(keepAlive);
+        return TorrentMessage(keepAlive);
     auto messageId = (uint8_t) reply[0];
     std::string payload = reply.substr(1);
-    SPDLOG_INFO("Received message with ID %d from peer [%s]", messageId, peer->ip)
-    return BitTorrentMessage(messageId, payload);
+    SPDLOG_INFO("Received message with ID %d from peer [%s]", messageId, peer->ip.c_str());
+    return TorrentMessage(messageId, payload);
 }
 
 const std::string &PeerConnection::getPeerId() const {
@@ -250,7 +248,7 @@ void PeerConnection::closeSock()
     {
         SPDLOG_INFO("Closed connection at socket %d", sock);
         close(sock);
-        sock ={};
+        sock = 0;
         requestPending = false;
         if(!peerBitField.empty())
         {

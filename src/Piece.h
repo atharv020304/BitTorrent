@@ -23,6 +23,6 @@ class Piece
         ~Piece();
         void reset();
 
-}
+};
 
 #endif

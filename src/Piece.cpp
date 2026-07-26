@@ -3,8 +3,8 @@
 #include <crypto/sha1.h>
 #include <spdlog/spdlog.h>
 
-#include <utils.h>
-#include <Piece.h>
+#include "utils.h"
+#include "Piece.h"
 
 Piece::Piece(int index, std::vector<Block *> blk, std::string hVal) : index(index),
                                                                       hVal(hVal)

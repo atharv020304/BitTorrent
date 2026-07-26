@@ -1,8 +1,7 @@
 #ifndef TORRENT_SHARED_QUEUE
 #define TORRENT_SHARED_QUEUE
 
-#include <queue>
-#include <ostream>
+#include <deque>
 #include <mutex>
 #include <condition_variable>
 
@@ -14,8 +13,10 @@ class SharedQueue
         ~SharedQueue();
 
         T& front();
-        T& pop_front();
+        T pop_front();
         void push_back(const T& item);
+        void push_back(T&& item);
+        void clear();
 
         int size();
         bool empty();
@@ -44,14 +45,14 @@ T& SharedQueue<T>::front()
 }
 
 template <typename T>
-T& SharedQueue<T>::pop_front()
+T SharedQueue<T>::pop_front()
 {
     std::unique_lock<std::mutex> mlock(mutex_);
     while (queue_.empty())
     {
         cond_.wait(mlock);
     }
-    T& front = queue_.front();
+    T front = queue_.front();
     queue_.pop_front();
     return front;
 }

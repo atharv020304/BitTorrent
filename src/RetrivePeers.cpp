@@ -1,3 +1,4 @@
+#include <sstream>
 #include <string>
 #include <iostream>
 #include <cpr/cpr.h>
@@ -14,25 +15,24 @@
 #define TRACKER_TIMEOUT 15000
 
 
-//constructor
 PeerRetriever::PeerRetriever(
         std::string peerId,
         std::string announceUrl,
         std::string infoHash,
         int port,
         const unsigned long fileSize
-){
-    this->peerId = std::move(peerId);
-    this->announceUrl = std::move(announceUrl);
-    this->infoHash = std::move(infoHash);
-    this->port = port;
-    this->fileSize = fileSize;
+) : peerId(std::move(peerId)),
+    announceUrl(std::move(announceUrl)),
+    infoHash(std::move(infoHash)),
+    port(port),
+    fileSize(fileSize)
+{
 }
 
-std::vector<Peer* > PeerRetriever::retrivePeers(unsigned long bytesDnld)
+std::vector<Peer*> PeerRetriever::retrievePeers(unsigned long bytesDnld)
 {
     std::stringstream info;
-    info << "Retrieving peers from " << announceUrl << "with following params... " << std::endl;
+    info << "Retrieving peers from " << announceUrl << " with following params... " << std::endl;
     info << "peer_id: "<< peerId << std::endl;
     info << "port: " << port << std::endl;
     info << "uploaded: " << 0 << std::endl;
@@ -60,7 +60,7 @@ std::vector<Peer* > PeerRetriever::retrivePeers(unsigned long bytesDnld)
 
     }else
     {
-        SPDLOG_INFO("ERROR response from tracker")
+        SPDLOG_INFO("ERROR response from tracker");
     }
     return std::vector<Peer*> ();
 }
@@ -75,10 +75,11 @@ std::vector<Peer*> PeerRetriever::decodeResp(std::string response) {
     
     std::shared_ptr<bencoding::BItem> peersValue = responseDict->getValue("peers");
     if(!peersValue)
+        throw std::runtime_error("Received malformed 'peers' from tracker. [Missing 'peers' key]");
 
     std::vector<Peer*> peers;
 
-    // case 1 : peer info is in binaru blob
+    // case 1 : peer info is in binary blob
     if(typeid(*peersValue) == typeid(bencoding::BString))
     {
         const int peerInfoSize = 6;
@@ -86,18 +87,18 @@ std::vector<Peer*> PeerRetriever::decodeResp(std::string response) {
 
         if(peerString.length() % peerInfoSize != 0)
         {
-            throw::std::runtime_error("Recieved malformed peers form tracker");
+            throw std::runtime_error("Received malformed peers from tracker");
         }
 
-        const int peerNum = peersString.length() / peerInfoSize;
+        const int peerNum = peerString.length() / peerInfoSize;
         for(int i=0; i< peerNum; i++)
         {
             int offset = i * peerInfoSize;
             std::stringstream peerIp;
-            peerIp << std::to_string((uint8_t) peersString[offset]) << ".";
-            peerIp << std::to_string((uint8_t) peersString[offset + 1]) << ".";
-            peerIp << std::to_string((uint8_t) peersString[offset + 2]) << ".";
-            peerIp << std::to_string((uint8_t) peersString[offset + 3]);
+            peerIp << std::to_string((uint8_t) peerString[offset]) << ".";
+            peerIp << std::to_string((uint8_t) peerString[offset + 1]) << ".";
+            peerIp << std::to_string((uint8_t) peerString[offset + 2]) << ".";
+            peerIp << std::to_string((uint8_t) peerString[offset + 3]);
             int peerPort = bytesToInt(peerString.substr(offset+4, 2));
 
             Peer* newPeer = new Peer { peerIp.str() , peerPort};
@@ -110,10 +111,8 @@ std::vector<Peer*> PeerRetriever::decodeResp(std::string response) {
         std::shared_ptr<bencoding::BList> peerList = std::dynamic_pointer_cast<bencoding::BList>(peersValue);
         for(auto &item : *peerList)
         {
-            //cast the item to a dict
             std::shared_ptr<bencoding::BDictionary> peerDict = std::dynamic_pointer_cast<bencoding::BDictionary>(item);
 
-            //gets peer ip from the dictionary
             std::shared_ptr<bencoding::BItem> tempPeerIp = peerDict->getValue("ip");
 
             if(!tempPeerIp){

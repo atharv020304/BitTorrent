@@ -16,7 +16,7 @@
 TorrentFileParser::TorrentFileParser(const std::string& path)
 {
     SPDLOG_INFO("Parsing Torrent File %s...",path.c_str());
-    std::ifstream fileStream(path, std::ifstream::binary);  //Opening in binary mode ensures bytes are read exactly as stored.
+    std::ifstream fileStream(path, std::ifstream::binary);
     std::shared_ptr<bencoding::BItem> decodedTorrentFile = bencoding::decode(fileStream);
     std::shared_ptr<bencoding::BDictionary> rootDict = std::dynamic_pointer_cast<bencoding::BDictionary>(decodedTorrentFile);
     root = rootDict;
@@ -24,12 +24,16 @@ TorrentFileParser::TorrentFileParser(const std::string& path)
 }
 
 std::shared_ptr<bencoding::BItem> TorrentFileParser::get(std::string key) const {
-    std::shared_ptr<bencoding::BItem> value = root->getValue(key);
+    std::shared_ptr<bencoding::BItem> infoDict = root->getValue("info");
+    if (!infoDict)
+        throw std::runtime_error("Torrent file is malformed. [File does not contain key 'info']");
+    std::shared_ptr<bencoding::BDictionary> info = std::dynamic_pointer_cast<bencoding::BDictionary>(infoDict);
+    std::shared_ptr<bencoding::BItem> value = info->getValue(key);
     return value;
 }
 
 std::string TorrentFileParser::getInfoHash() const{
-    std::shared_ptr<bencoding::BItem> infoDict = get("info");
+    std::shared_ptr<bencoding::BItem> infoDict = root->getValue("info");
     std::string infoString = bencoding::encode(infoDict);
     std::string sha1Hash = sha1(infoString);
     return sha1Hash;
@@ -82,7 +86,7 @@ std::string TorrentFileParser::getFileName() const{
 
 std::string TorrentFileParser::getAnnounce() const
 {
-    std::shared_ptr<bencoding::BItem> announceItem = get("announce");
+    std::shared_ptr<bencoding::BItem> announceItem = root->getValue("announce");
     if (!announceItem)
         throw std::runtime_error("Torrent file is malformed. [File does not contain key 'announce']");
     std::string announce = std::dynamic_pointer_cast<bencoding::BString>(announceItem)->value();

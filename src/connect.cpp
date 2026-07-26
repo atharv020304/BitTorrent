@@ -11,6 +11,7 @@
 #include <limits>
 #include <spdlog/spdlog.h>
 #include "connect.h"
+#include "utils.h"
 
 #define TIMEOUT_FOR_READ 3000
 #define CONNECTION_TIMEOUT 3
@@ -27,7 +28,7 @@ bool setSocketBlocking(int sock, bool blocking)
     return (fcntl(sock, F_SETFL, flags) == 0);
 }
 
-int createConnection(std::string& ip, const int port)
+int createConnection(const std::string& ip, const int port)
 {
     int sock = 0;
     struct sockaddr_in address;

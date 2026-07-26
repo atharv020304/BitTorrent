@@ -1,5 +1,10 @@
-#include <bits/stdc++.h>
-#include <lib/spdlog/spdlog.h>
+#include <iostream>
+#include <sstream>
+#include <algorithm>
+#include <cmath>
+#include <iomanip>
+#include <climits>
+#include <spdlog/spdlog.h>
 #include <unistd.h>
 #include "PieceManager.h"
 #include "Block.h"
@@ -46,7 +51,7 @@ std::vector<Piece*> PieceManager::initPieces()
     std::vector<std::string> pieceHashes = fileParser.splitPieceHashes();
     totalPieces = pieceHashes.size();
     std::vector<Piece*> torrentPieces;
-    missingPieces.reserve(totalPieces);
+    torrentPieces.reserve(totalPieces);
 
     long totalLength = fileParser.getFileSize();
 
@@ -122,12 +127,12 @@ void PieceManager::removePeer(const std::string& peerId)
     if (iter != peers.end())
     {
         peers.erase(iter);
-        lock.unlock();
-       std::stringstream info;
+        std::stringstream info;
         info << "Number of connections: " <<
              std::to_string(peers.size()) << "/" + std::to_string(maxConnections);
-        SPDLOG_INFO("%s", info.str().c_str()); 
-}
+        SPDLOG_INFO("%s", info.str().c_str());
+    }
+    lock.unlock();
 }
 
 
@@ -153,7 +158,11 @@ Block* PieceManager::nextRequest(std::string peerId)
     {
         block = nextOngoing(peerId);
         if(!block)
-            block = getRarestPiece(peerId)->nextRequest();
+        {
+            Piece* piece = getRarestPiece(peerId);
+            if (piece)
+                block = piece->nextRequest();
+        }
     }
 
     lock.unlock();
@@ -216,7 +225,7 @@ Piece* PieceManager::getRarestPiece(std::string peerId)
         }
     }
 
-    Piece* rarest;
+    Piece* rarest = nullptr;
     int leastCount = INT16_MAX;
     for (auto const& [piece, count] : pieceCount)
     {
@@ -226,6 +235,9 @@ Piece* PieceManager::getRarestPiece(std::string peerId)
             rarest = piece;
         }
     }
+
+    if (!rarest)
+        return nullptr;
 
     missingPieces.erase(
             std::remove(missingPieces.begin(), missingPieces.end(), rarest),
@@ -294,7 +306,7 @@ void PieceManager::blockReceived(std::string peerId, int pieceindex, int blockOf
 
             std::stringstream info;
             info << "(" << std::fixed << std::setprecision(2) << (((float) havePieces.size()) / (float) totalPieces * 100) << "%) ";
-            info << std::to_string(havePieces.size() + " / " + std::to_string(totalPieces) + "Pieces downloaded...";
+            info << std::to_string(havePieces.size()) + " / " + std::to_string(totalPieces) + " Pieces downloaded...";
             SPDLOG_INFO("%s", info.str().c_str());
 
         }else
@@ -334,7 +346,7 @@ void PieceManager::displayProgressBar()
     double avgDownloadSpeed = (double) downloadedLength / (double) PROGRESS_DISPLAY_INTERVAL;
     double avgDownloadSpeedInMBS = avgDownloadSpeed / pow(10, 6);
 
-    info << "[Peers: " + std::to_string(peers.size()) + "/" + std::to_string(maximumConnections) + ", ";
+    info << "[Peers: " + std::to_string(peers.size()) + "/" + std::to_string(maxConnections) + ", ";
     info << std::fixed << std::setprecision(2) << avgDownloadSpeedInMBS << " MB/s, ";
 
     double timePerPiece = (double) PROGRESS_DISPLAY_INTERVAL / (double) piecesDownloadedInInterval;

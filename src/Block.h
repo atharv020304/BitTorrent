@@ -1,6 +1,8 @@
 #ifndef BITTORRENTCLIENT_BLOCK_H
 #define BITTORRENTCLIENT_BLOCK_H
 
+#include <string>
+
 enum Status
 {
     missing = 0,

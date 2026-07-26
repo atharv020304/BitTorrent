@@ -1,6 +1,7 @@
 #include <iostream>
 #include <sstream>
 #include <bitset>
+#include <arpa/inet.h>
 #include "TorrentMessage.h"
 
 
@@ -23,11 +24,11 @@ std::string TorrentMessage::getPayload()
 std::string TorrentMessage::toString()
 {
     std::stringstream buff;
-    char* mLengthAddr = (char*)& length; 
+    uint32_t networkLength = htonl(length);
+    char* mLengthAddr = (char*)&networkLength; 
     std::string mLengthStr;
     
-    // Access length as bytes and serialize in network byte order
-    for(int i = 4; i >= 0 ;i--)
+    for(int i = 3; i >= 0 ;i--)
     {
         mLengthStr.push_back((char) mLengthAddr[i]);
     }

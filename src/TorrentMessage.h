@@ -2,6 +2,7 @@
 #define TORRENTMESSAGE_H
 
 #include <cstdint>
+#include <string>
 
 enum messageID
 {
@@ -13,7 +14,8 @@ enum messageID
     bitField = 5,
     request = 6,
     piece = 7,
-    cancel = 8
+    cancel = 8,
+    keepAlive = 255
 };
 
 class TorrentMessage
@@ -31,4 +33,4 @@ class TorrentMessage
 
 };
 
-#endif~
+#endif

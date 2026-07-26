@@ -1,20 +1,20 @@
-#include <random>
 #include <iostream>
+#include <random>
 #include <thread>
+#include <ctime>
 #include <bencode/bencoding.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 
-#include "PeerConnection.h"
+#include "ConnectToPeer.h"
 #include "Client.h"
 #include "TorrentFileParser.h"
 #include "RetrivePeers.h"
-#include "ConnectToPeer.h"
 
 #define PORT 8081
-#define INTERVAL_Q = 60
+#define PEER_QUERY_INTERVAL 60
 
-TorrentClient::TorrentClient(const int threadNum, bool log, std::string LogFilePath) : threadNum(threadNum)
+TorrentClient::TorrentClient(const int threadNum, bool log, std::string logFilePath) : threadNum(threadNum)
 {
     peerId = "-UT2021-";
 
@@ -28,19 +28,22 @@ TorrentClient::TorrentClient(const int threadNum, bool log, std::string LogFileP
 
     if (log)
     {
-        logger = spdlog::basic_logger_mt("file_logger", logFilePath, true); // true = truncate
-        logger->set_level(spdlog::level::trace);                            // Log everything
-        logger->flush_on(spdlog::level::trace);                             // Flush after every message
+        logger = spdlog::basic_logger_mt("file_logger", logFilePath, true);
+        logger->set_level(spdlog::level::trace);
+        logger->flush_on(spdlog::level::trace);
         spdlog::set_default_logger(logger);
     }
     else
     {
-        // Disable all logging
         spdlog::set_level(spdlog::level::off);
     }
 }
 
-TorrentClient::~TorrentClient() = default;
+TorrentClient::~TorrentClient()
+{
+    for (auto connection : connections)
+        delete connection;
+}
 
 void TorrentClient::downloadFile(const std::string& torrentFilePath, const std::string& downloadDirectory)
 {
@@ -53,13 +56,16 @@ void TorrentClient::downloadFile(const std::string& torrentFilePath, const std::
     const std::string infoHash = torrentFileParser.getInfoHash();
 
     std::string filename = torrentFileParser.getFileName();
-    std::string downloadPath = downloadDirectory + filename;
+    std::string downloadPath = downloadDirectory;
+    if (!downloadPath.empty() && downloadPath.back() != '/' && downloadPath.back() != '\\')
+        downloadPath += '/';
+    downloadPath += filename;
     PieceManager pieceManager(torrentFileParser, downloadPath, threadNum);
 
     for (int i = 0; i < threadNum; i++)
     {
-        PeerConnection connection(&queue, peerId, infoHash, &pieceManager);
-        connections.push_back(&connection);
+        auto connection = new PeerConnection(&queue, peerId, infoHash, &pieceManager);
+        connections.push_back(connection);
         std::thread thread(&PeerConnection::start, connection);
         threadPool.push_back(std::move(thread));
     }
