@@ -1,4 +1,4 @@
-PROJECT_NAME           = "BitTorrentClient"
+PROJECT_NAME           = "Torrent Client Implementation in cpp"
 OUTPUT_DIRECTORY       = docs
 INPUT                  = src lib/bencode lib/crypto
 FILE_PATTERNS          = *.h *.hpp *.cpp
