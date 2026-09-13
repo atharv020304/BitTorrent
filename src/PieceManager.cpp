@@ -6,6 +6,8 @@
 #include <climits>
 #include <spdlog/spdlog.h>
 #include <unistd.h>
+#include <cmath>
+
 #include "PieceManager.h"
 #include "Block.h"
 #include "utils.h"
@@ -63,7 +65,7 @@ std::vector<Piece*> PieceManager::initPieces()
         if(i == totalPieces - 1)
         {
             remLength = totalLength % pieceLength;
-            blockCount = std::max( (int) ceil(remLength /B_SIZE));
+            blockCount = std::max(1, (int)std::ceil((double)remLength / B_SIZE));
         }
 
             std::vector<Block* >blocks;
@@ -195,7 +197,7 @@ Block* PieceManager::nextOngoing(std::string peerId)
     {
         if(hasPiece(peers[peerId], piece->index))
         {
-            Block* block = piece->nextReq();
+            Block* block = piece->nextRequest();
             if(block)
             {
                 auto currentTime = std::time(nullptr);
