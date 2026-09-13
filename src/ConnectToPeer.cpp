@@ -228,7 +228,7 @@ std::string PeerConnection::createHandshakeMessage()
     return buffer.str();
 }
 
-TorrentMessage PeerConnection::receiveMessage(int bufferSize) const{
+TorrentMessage PeerConnection::receiveMessage(int bufferSize){
     std::string reply = receiveData(sock, bufferSize);
     if(reply.empty())
         return TorrentMessage(keepAlive);
