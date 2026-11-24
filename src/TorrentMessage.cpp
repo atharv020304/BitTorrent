@@ -23,18 +23,12 @@ std::string TorrentMessage::getPayload()
 
 std::string TorrentMessage::toString()
 {
-    std::stringstream buff;
-    uint32_t networkLength = htonl(length);
-    char* mLengthAddr = (char*)&networkLength; 
-    std::string mLengthStr;
-    
-    for(int i = 3; i >= 0 ;i--)
-    {
-        mLengthStr.push_back((char) mLengthAddr[i]);
-    }
-    buff << mLengthStr;
-    buff << (char) id;
-    buff << payload;
-    return buff.str();
-
+    std::string out;
+    out.push_back(char(length >> 24));
+    out.push_back(char(length >> 16));
+    out.push_back(char(length >> 8));
+    out.push_back(char(length));
+    out.push_back(char(id));
+    out += payload;
+    return out
 }
