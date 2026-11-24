@@ -24,7 +24,7 @@ class Piece
 
         explicit Piece(int index, std::vector<Block*> blk, std::string hVal);
         std::string getData();
-        Block* nextReq();
+        Block* nextRequest();
         void blockReceived(int offset, std::string data);
         bool isComplete();
         bool isMatchingHash();

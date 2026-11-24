@@ -6,6 +6,8 @@
 #include <climits>
 #include <spdlog/spdlog.h>
 #include <unistd.h>
+#include <cmath>
+
 #include "PieceManager.h"
 #include "Block.h"
 #include "utils.h"
@@ -194,7 +196,7 @@ Block* PieceManager::nextOngoing(std::string peerId)
     {
         if(hasPiece(peers[peerId], piece->index))
         {
-            Block* block = piece->nextReq();
+            Block* block = piece->nextRequest();
             if(block)
             {
                 auto currentTime = std::time(nullptr);

@@ -47,7 +47,6 @@ class PeerConnection
     public:
         const std::string &getPeerId() const;
         explicit PeerConnection(SharedQueue<Peer*>* queue, std::string clientId, std::string infoHash, PieceManager* pieceManager);
-        ~PeerConnection();
         void start();
         void stop();
 };

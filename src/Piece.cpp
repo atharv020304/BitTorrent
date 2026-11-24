@@ -20,7 +20,7 @@ Piece::~Piece()
     }
 }
 
-Block *Piece::nextReq()
+Block *Piece::nextRequest()
 {
     for (Block *b : blk)
     {

@@ -7,7 +7,7 @@
 #include <iostream>
 #include <bitset>
 #include <map>
-#include <cxxopts/cxxopts.hpp>
+#include <cxxopts.hpp>
 #include "Client.h"
 
 int main(int argc, const char* argv[])
