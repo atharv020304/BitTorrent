@@ -246,11 +246,14 @@ Piece* PieceManager::getRarestPiece(std::string peerId)
     return rarest;
 }
 
-void PieceManager::write(Piece* piece)
+bool PieceManager::write(Piece* piece)
 {
-    long position = piece->index * fileParser.getPieceLength();
-    downloadedFile.seekp(position); //move to the correct position in filestream and save the piece inside disks
-    downloadedFile << piece->getData();
+    const std::string data = piece->getData();
+    std::lock_guard<std::mutex> guard(fileLock);
+    downloadedFile.seekp((std::streamoff)piece->index * pieceLength);
+    downloadedFile.write(data.data(), (std::streamsize)data.size());
+    downloadedFile.flush();
+    return downloadedFile.good();
 }
 
 void PieceManager::blockReceived(std::string peerId, int pieceindex, int blockOffset, std::string data)

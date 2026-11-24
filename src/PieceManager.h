@@ -8,7 +8,7 @@
 #include <mutex>
 #include <fstream>
 #include <thread>
-
+#include <atomic>
 #include "Piece.h"
 #include "TorrentFileParser.h"
 
@@ -37,12 +37,14 @@ private:
 
     // lock to prevent race conds
     std::mutex lock;
+    std::mutex fileLock;
+    std::atomic<bool> writeFailed{false};
 
     std::vector<Piece*> initPieces();
     Block *expiredRequest(std::string peerId);
     Block *nextOngoing(std::string peerId);
     Piece *getRarestPiece(std::string peerId);
-    void write(Piece *piece);
+    bool write(Piece *piece);
     void displayProgressBar();
     void trackProgress();
 
@@ -54,6 +56,7 @@ public:
     void addPeer(const std::string &peerId, std::string bitField);
     void removePeer(const std::string &peerId);
     void updatePeer(const std::string &peerId, int index);
+    bool failed() const { return writeFailed.load() };
     unsigned long bytesDownloaded();
     Block *nextRequest(std::string peerId);
 };
