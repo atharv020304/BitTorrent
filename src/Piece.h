@@ -29,7 +29,8 @@ class Piece
         bool isComplete();
         bool isMatchingHash();
         ~Piece();
-        void reset();
+        void Piece::releaseData() {for (Block* b : blk) std::string().swap(b->data);};
+        void reset() {for (Block* b : blk) { b->status= missing; std::string().swap(b->data);}};
 
 };
 

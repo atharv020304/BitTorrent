@@ -131,7 +131,7 @@ Block* PieceManager::nextRequest(std::string peerId)
     //return next block that should be requested from the given peer.
 
     lock.lock();
-    if (missingPieces.empty())
+    if (missingPieces.empty() && ongoingPieces.empty())
     {
         lock.unlock();
         return nullptr;
@@ -151,7 +151,16 @@ Block* PieceManager::nextRequest(std::string peerId)
         {
             Piece* piece = getRarestPiece(peerId);
             if (piece)
-                block = piece->nextRequest();
+                {
+                    block = piece->nextReq();
+                    if(block)
+                    {
+                        auto* req = new pRequest;
+                        req->block = block;
+                        req->timestamp = std:time(nullptr);
+                        pendingReqs.push_back(req);
+                    }
+                }
         }
     }
 
