@@ -10,7 +10,7 @@
 #include "Block.h"
 #include "utils.h"
 
-#define B_SIZE 16382
+#define B_SIZE 16384
 #define MAX_PENDING_TIME 5
 #define PROGRESS_BAR_WIDTH 40
 #define PROGRESS_DISPLAY_INTERVAL 1

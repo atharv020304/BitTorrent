@@ -30,5 +30,5 @@ std::string TorrentMessage::toString()
     out.push_back(char(length));
     out.push_back(char(id));
     out += payload;
-    return out
+    return out;
 }
