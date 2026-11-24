@@ -212,7 +212,7 @@ bool PeerConnection::establishNewConnection()
 
 std::string PeerConnection::createHandshakeMessage()
 {
-    const std::string protocol = "BitTorrent";
+    const std::string protocol = "BitTorrent protocol";
     std::stringstream buffer;
     buffer << (char) protocol.length();
     buffer << protocol;

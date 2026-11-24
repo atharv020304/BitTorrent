@@ -9,6 +9,7 @@
 #define BENCODING_DECODER_H
 
 #include <exception>
+#include <stdexcept>
 #include <memory>
 #include <string>
 
