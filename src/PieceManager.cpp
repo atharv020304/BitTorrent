@@ -55,35 +55,25 @@ std::vector<Piece*> PieceManager::initPieces()
 
     long totalLength = fileParser.getFileSize();
 
-    int blockCount = ceil(pieceLength / B_SIZE);
-    long remLength = pieceLength;
-
     for(int i=0; i< totalPieces; i++)
     {
-        if(i == totalPieces - 1)
+        long thisPieceLength = pieceLength;
+        if (i ==totalPieces - 1)
+            thisPieceLength = totalLength - (long)(totalPieces - 1) * pieceLength;
+
+        const int blockCount = (int)((thisPieceLength + B_SIZE - 1) / B_SIZE);
+        std::vector<Block*> blocks;
+        blocks.reserve(blockCount);
+        for(int b=0; b <blockCount; b++)
         {
-            remLength = totalLength % pieceLength;
-            blockCount = std::max( (int) ceil(remLength /B_SIZE));
+            Block* block = new Block;
+            block->piece = i;
+            block->status = missing;
+            block->offset = b * B_SIZE;
+            block->length = (int)std::min<long>(B_SIZE, thisPieceLength - (long)b * B_SIZE);
+            blocks.push_back(block);
         }
-
-            std::vector<Block* >blocks;
-            blocks.reserve(blockCount);
-
-            for(int offset = 0 ; offset < blockCount; offset++){
-                Block* block = new Block;
-                block->piece = i;
-                block->status = missing;
-                block->offset = offset * B_SIZE;
-                int blockSize = B_SIZE;
-                if( i == totalPieces - 1 && offset == blockCount - 1 )
-                {
-                    blockSize = remLength % B_SIZE;
-                }
-                block->length = blockSize;
-                blocks.push_back(block);
-            }
-        auto piece = new Piece(i,blocks,pieceHashes[i]);
-        torrentPieces.emplace_back(piece);
+        torrentPieces.emplace_back(new Piece(i, blocks, pieceHashes[i]));
     }
     return torrentPieces;
 }
