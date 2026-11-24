@@ -33,17 +33,19 @@ Block *Piece::nextReq()
     return NULL;
 }
 
-void Piece::blockReceived(int offset, std::string data)
+bool Piece::blockReceived(int offset, std::string data)
 {
     for (Block *b : blk)
     {
         if (b->offset == offset)
-        {
+        {   
+            if(b->status == retrieved || (int)data.size() != b->length) return false;
             b->status = retrieved;
-            b->data = data;
-            return;
+            b->data = std::move(data);
+            return true;
         }
     }
+    return false;
 }
 
 bool Piece::isComplete()
