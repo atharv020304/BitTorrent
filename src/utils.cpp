@@ -54,28 +54,22 @@ std::string hexEncode(const std::string& input)
 }
 
 bool hasPiece(const std::string& bitField, int index){
-    int byteIndex = floor(index / 8);
-    int offset = index % 8;
-    return (bitField[byteIndex] >> (7 - offset)& 1) != 0;
+    if (index < 0 || (size_t)index / 8 >= bitField.size()) return false;
+    return ((unsigned char)bitField[index / 8] >> (7 - index % 8)) & 1; 
 }
 
 void setPiece(std::string& bitField, int index)
 {
-    int byteIndex = floor(index / 8);
-    int ofst = index % 8;
-    bitField[byteIndex] |= ( 1 << ( 7 - ofst));
+    if (index < 0 || (size_t)index / 8 >= bitField.size()) return;
+    bitField[index / 8] = (char)((unsigned char)bitField[index / 8] | (1u << (7 - index % 8)));
 }
 
 
 int bytesToInt(std::string bytes)
 {
-    std::string binStr;
-    long n = bytes.size();
-    for(int i = 0 ; i < n; i++)
-    {
-        binStr += std::bitset<8>(bytes[i]).to_string();  //storing as bit
-    }
-    return stoi(binStr, 0, 2); //convert to integer base 2.
+    uint32_t v = 0;
+    for (unsigned char c : bytes) v = (v << 8) | c;
+    return (int)v;
 }
 
 // using as it is from gfg
