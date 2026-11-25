@@ -6,6 +6,7 @@
 #include <climits>
 #include <spdlog/spdlog.h>
 #include <unistd.h>
+#include <chrono>
 #include <cmath>
 
 #include "PieceManager.h"
@@ -335,12 +336,14 @@ unsigned long PieceManager::bytesDownloaded()
 
 void PieceManager::trackProgress()
 {
-    usleep(pow(10, 6));
-    while (!isComplete())
+    std::unique_lock<std::mutex> guard(progressMutex);
+    while( !progressCv.wait_for( guard, std::chrono::seconds(PROGRESS_DISPLAY_INTERVAL), [this] { return stopProgress; }))
     {
+        guard.unlock();
         displayProgressBar();
-        piecesDownloadedInInterval = 0;
-        usleep(PROGRESS_DISPLAY_INTERVAL * pow(10,6));
+        guard.lock();
+        if( isComplete())
+            break;
     }
 }
 
@@ -357,9 +360,10 @@ void PieceManager::displayProgressBar()
     info << "[Peers: " + std::to_string(peers.size()) + "/" + std::to_string(maxConnections) + ", ";
     info << std::fixed << std::setprecision(2) << avgDownloadSpeedInMBS << " MB/s, ";
 
-    double timePerPiece = (double) PROGRESS_DISPLAY_INTERVAL / (double) piecesDownloadedInInterval;
-    long remainingTime = ceil(timePerPiece * (totalPieces - downloadedPieces));
-    info << "ETA: " << formatTime(remainingTime) << "]";
+    std::string eta = "inf";
+    if (piecesDownloadedInInterval > 0)
+        eta = formatTime((long)ceil((double)PROGRESS_DISPLAY_INTERVAL / piecesDownloadedInInterval * ( totalPieces - downloadedPieces)));
+    info << "ETA: " << eta << "]";
 
     double progress = (double) downloadedPieces / (double) totalPieces;
     int pos = PROGRESS_BAR_WIDTH * progress;
@@ -378,9 +382,11 @@ void PieceManager::displayProgressBar()
     long timeSinceStart = floor(std::difftime(currentTime, startingTime));
 
     info << "in " << formatTime(timeSinceStart);
+    piecesDownloadedInInterval = 0;
+    const bool complete =  (downloadedPieces == (unsigned long)totalPieces);
+    lock.unlock();
     std::cout << info.str() << "\r";
     std::cout.flush();
-    lock.unlock();
-    if (isComplete())
-        std::cout << std::endl;
+    if (complete) std::cout << std::endl;
+
 }
