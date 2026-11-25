@@ -227,27 +227,25 @@ Block* PieceManager::nextOngoing(std::string peerId)
 Piece* PieceManager::getRarestPiece(std::string peerId)
 {
     
-    auto comp = [](const Piece* a, const Piece* b) { return a->index < b->index; };
-    std::map<Piece*, int, decltype(comp)> pieceCount(comp);
+    const std::string& mine = peers[peerId];
+    Piece* rarest = nullptr;
+    int leastCount = INT_MAX;
     for (Piece* piece : missingPieces)
     {
-       
-        if (peers.find(peerId) != peers.end())
+        if(!hasPiece(mine, piece->index)) continue;
+        int count = 0;
+        for (const auto& e : peers)
         {
-            if (hasPiece(peers[peerId], piece->index))
-                pieceCount[piece] += 1;
+            if(hasPiece(e.second, piece->index))
+            {
+                count++;
+            }
         }
-    }
-
-    Piece* rarest = nullptr;
-    int leastCount = INT16_MAX;
-    for (auto const& [piece, count] : pieceCount)
-    {
-        if (count < leastCount)
+        if(count  < leastCount)
         {
             leastCount = count;
             rarest = piece;
-        }
+        }  
     }
 
     if (!rarest)
@@ -329,7 +327,7 @@ void PieceManager::blockReceived(std::string peerId, int pieceindex, int blockOf
 unsigned long PieceManager::bytesDownloaded()
 {
     lock.lock();
-    unsigned long bytesDownloaded = havePieces.size() * pieceLength;
+    unsigned long bytesDownloaded = std::min<unsigned long>(havePieces.size() * pieceLength, fileParser.getFileSize());
     lock.unlock();
     return bytesDownloaded;
 }
