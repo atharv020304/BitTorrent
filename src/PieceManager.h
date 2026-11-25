@@ -25,7 +25,7 @@ private:
     std::vector<Piece *> missingPieces;
     std::vector<Piece *> ongoingPieces;
     std::vector<Piece *> havePieces;
-    std::vector<pRequest *> pendingReqs;
+    std::vector<pRequest*> pendingReqs;
     std::ofstream downloadedFile;
 
     const long pieceLength;

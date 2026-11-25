@@ -260,65 +260,57 @@ bool PieceManager::write(Piece* piece)
 
 void PieceManager::blockReceived(std::string peerId, int pieceindex, int blockOffset, std::string data)
 {
-    SPDLOG_INFO("Recieved block %d for piece %d from peer %s",blockOffset, pieceindex, peerId.c_str());
+    SPDLOG_INFO("Recieved block {} for piece {} from peer {}",blockOffset, pieceindex, peerId);
 
-    pRequest* requestToRemove = nullptr;
-    lock.lock();
-    for (pRequest* pending : pendingReqs)
+    std::unique_lock<std::mutex> guard(lock);
+
+    for( auto it = pendingReqs.begin(); it != pendingReqs.end();)
     {
-        if(pending->block->piece == pieceindex && pending->block->offset == blockOffset)
+        if ((*it)->block->piece == pieceindex && (*it)->block->offset == blockOffset)
         {
-            requestToRemove = pending;
-            break;
+            delete *it;
+            it = pendingReqs.erase(it);
+        }else
+        {
+            it++;
         }
     }
 
-    pendingReqs.erase(
-        std::remove(pendingReqs.begin(),pendingReqs.end(), requestToRemove),
-        pendingReqs.end()
-    );
-
-    // retrive the target piece
     Piece* targetPiece = nullptr;
-    for(Piece* p : ongoingPieces)
+    for (Piece* p : ongoingPieces)
     {
-        if (p->index == pieceindex)
+        if(p->index == pieceindex)
         {
             targetPiece = p;
             break;
         }
     }
+    if(!targetPiece) return;
 
-    lock.unlock();
-    if(!targetPiece)
-        throw std::runtime_error("wrong block recieved");
-    
-    targetPiece->blockReceived(blockOffset, std::move(data));
-    if(targetPiece->isComplete())
+    if(!targetPiece->blockReceived(blockOffset, std::move(data))) return;
+    if (!targetPiece->isComplete()) return;
+
+    ongoingPieces.erase(std::remove(ongoingPieces.begin(), ongoingPieces.end(),targetPiece), ongoingPieces.end());
+    guard.unlock();
+    const bool hashOk = targetPiece->isMatchingHash();
+    const bool written = hashOk && write(targetPiece);
+    guard.lock();
+
+    if(hashOk && written)
     {
-        if(targetPiece->isMatchingHash())
-        {   
-            // check hash matches, write it to desk
-            write(targetPiece);
-            lock.lock();
-            //remove the piece from ongoing list
-            ongoingPieces.erase(std::remove(ongoingPieces.begin(), ongoingPieces.end(),targetPiece),ongoingPieces.end());
+        targetPiece->releaseData();
+        havePieces.push_back(targetPiece);
+        piecesDownloadedInInterval++;
+        SPDLOG_INFO("({:.2f}%) {} / {} Pieces Downloaded...", 100.0f * havePieces.size() /totalPieces,  havePieces.size(), totalPieces);
 
-            havePieces.push_back(targetPiece);
-            piecesDownloadedInInterval++;
-            lock.unlock();
-
-            std::stringstream info;
-            info << "(" << std::fixed << std::setprecision(2) << (((float) havePieces.size()) / (float) totalPieces * 100) << "%) ";
-            info << std::to_string(havePieces.size()) + " / " + std::to_string(totalPieces) + " Pieces downloaded...";
-            SPDLOG_INFO("%s", info.str().c_str());
-
-        }else
-        {
-            targetPiece->reset();
-            SPDLOG_INFO("Hash mismatch for Piece %d", targetPiece->index);
-        }
+    }else{
+        targetPiece->reset();
+        ongoingPieces.push_back(targetPiece);
+        if (hashOk) writeFailed = true;
+        else SPDLOG_INFO("Hash Mismatch for piece {}", targetPiece->index);
     }
+
+
 }
 
 unsigned long PieceManager::bytesDownloaded()
