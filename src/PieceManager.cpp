@@ -25,16 +25,23 @@ PieceManager::PieceManager(
 {
     missingPieces = initPieces();
     // create a destination file with specified size
-    downloadedFile.open(dPath, std::ios::binary | std::ios::out);
+    downloadedFile.open(dPath, std::ios::binary | std::ios::out | std::ios::trunc);
+    if(!downloadedFile.is_open())
+    {
+        for (Piece* p : missingPieces) delete p;
+        throw std::runtime_error("Can not open file");
+    }
     downloadedFile.seekp(fileParser.getFileSize() - 1);
-    downloadedFile.write("",1);
-
+    downloadedFile.put('\0');
+    downloadedFile.flush();
     startingTime = std::time(nullptr);
-    std::thread progressThread([this] { this->trackProgress(); } );
-    progressThread.detach();
+    progressThread = std::thread([this] { trackProgress(); });
 }
 
 PieceManager::~PieceManager() {
+    { std::lock_guard<std::mutex> g(progressMutex); stopProgress = true; }
+    progressCv.notify_all();
+    if(progressThread.joinable()) progressThread.join();
     for(Piece* p: missingPieces)
         delete p;
     
@@ -43,6 +50,11 @@ PieceManager::~PieceManager() {
     
     for(pRequest* p : pendingReqs)
         delete p;
+
+    for(Piece* p : havePieces)
+    {
+        delete p;
+    }
 
     downloadedFile.close();
 

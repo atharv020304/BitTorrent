@@ -11,6 +11,7 @@
 #include <atomic>
 #include "Piece.h"
 #include "TorrentFileParser.h"
+#include <condition_variable>
 
 struct pRequest
 {
@@ -39,6 +40,10 @@ private:
     std::mutex lock;
     std::mutex fileLock;
     std::atomic<bool> writeFailed{false};
+    std::thread progressThread;
+    std::mutex progressMutex;
+    std::condition_variable progressCv;
+    bool stopProgress = false;
 
     std::vector<Piece*> initPieces();
     Block *expiredRequest(std::string peerId);
