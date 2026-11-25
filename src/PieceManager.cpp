@@ -102,12 +102,13 @@ bool PieceManager::isComplete() {
 
 void PieceManager::addPeer(const std::string& peerId, std::string bitField)
 {
-    lock.lock();
-    peers[peerId] = bitField;
-    lock.unlock();
-    std::stringstream info;
-    info << "Number of connections: " <<  std::to_string(peers.size()) << "/" + std::to_string(maxConnections);
-    SPDLOG_INFO("%s", info.str().c_str());
+    bitField.resize((totalPieces + 7) / 8, '\0');
+    size_t count;
+    { std::lock_guard<std::mutex> g(lock); 
+      peers[peerId] = std::move(bitField);
+      count = peers.size();
+    }
+    SPDLOG_INFO("Number of Connections: {}/ {}", count, maxConnections);
 }
 
 void PieceManager::updatePeer(const std::string& peerId, int index)
