@@ -30,51 +30,34 @@ bool setSocketBlocking(int sock, bool blocking)
 
 int createConnection(const std::string& ip, const int port)
 {
-    int sock = 0;
-    struct sockaddr_in address;
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        throw std::runtime_error("cannot create socket" + std::to_string(sock));
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0) throw std::runtime_error(std::string("can not create socket"));
+    auto fail = [sock](const std::string& msg) { close(sock); throw std::runtime_error(msg); };
 
+    sockaddr_in address;
+    memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
     address.sin_port = htons(port);
+    if(inet_pton(AF_INET, ip.c_str(), &address.sin_addr) != 1) fail("Invalid Ip: " + ip);
+    if(!setSocketBlocking(sock, false)) fail("error occured while setting the socket");
 
-    char* tempIp = new char[ip.length()+1];
-    strcpy(tempIp,ip.c_str());
-
-    // convert ip from string to struct in_addr
-    if (inet_pton(AF_INET, tempIp, &address.sin_addr) <= 0)
-        throw std::runtime_error("Invalid Ip");
-
-    if(!setSocketBlocking(sock, false))
-        throw std::runtime_error("error occured while setting the socket");
-
-    connect(sock, (struct sockaddr*)& address, sizeof(address));
-
-    fd_set fs;
-    struct timeval tv;
-
-    FD_ZERO(&fs);
-    FD_SET(sock,&fs);
-    tv.tv_sec = CONNECTION_TIMEOUT;
-    tv.tv_usec = 0;
-
-    if(select(sock+1, NULL, &fs, NULL, &tv) == 1)
+    int rc = connect(sock, (sockaddr*)&address, sizeof(address));
+    if( rc < 0 && errno != EINPROGRESS ) fail("Connect to "+ ip +" failed" + stderror(errno));
+    if(rc != 0)
     {
-    int so_error;
-    socklen_t len = sizeof so_error;
-    
-    getsockopt(sock, SOL_SOCKET, SO_ERROR, &so_error, &len);
-
-    if(so_error == 0)
-    {
-        //set to blocking mode
-        if(!setSocketBlocking(sock,true))
-            throw std::runtime_error("error at binding");
+        pollfd pfd{sock, POLLOUT, 0};
+        int ret; do { ret = poll(&pfd, 1 , CONNECTION_TIMEOUT * 1000); } while (ret < 0 && errno != EINTR);
+        if(ret <= 0) fail("Connect to "+ ip + " failed");
+        int soError = 0;
+        socklen_t len = sizeof soError;
+        if(getsockopt(sock, SOL_SOCKET, SO_ERROR, &soError, &len) < 0 || soError != 0)
+            fail("Connect to " + ip + ":" + std::to_string(port) + " failed");
+        
+        if(!setSocketBlocking(sock, true)) fail("error at binding");
+        timeval tv{10,0};
+        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv);
         return sock;
     }
-    }
-    close(sock);
-    throw std::runtime_error("Connect to" + ip + ":Failed  [Connection timeout] ");
 }
 
 void sendData(const int sock, const std::string& d)
