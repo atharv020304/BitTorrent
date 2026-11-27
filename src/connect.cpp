@@ -13,7 +13,6 @@
 #include "connect.h"
 #include "utils.h"
 
-#define TIMEOUT_FOR_READ 3000
 #define CONNECTION_TIMEOUT 3
 
 bool setSocketBlocking(int sock, bool blocking)
@@ -87,91 +86,56 @@ void sendData(const int sock, const std::string &d)
     }
 }
 
-std::string receiveData(const int sock, uint32_t bufferSize)
+static void readExactly( int sock, char* dst, size_t n, int timeoutMs)
 {
-    std::string r;
-
-    // If buffer size is not provided, read the first 4 bytes
-    // which contain the incoming message length.
-    if (!bufferSize)
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeoutMs);
+    size_t got = 0;
+    while(got < n)
     {
-        struct pollfd fd;
-        int ret;
-        fd.fd = sock;
-        fd.events = POLLIN;
-
-        ret = poll(&fd, 1, 3000);
-
-        long bytesRead = 0;
-        const int lenIndSize = 4;
-        char buff[lenIndSize];
-
-        switch (ret)
+        auto left = std::chrono::duration_cast<std::chrono::milliseconds> (deadline - std::chrono::steady_clock::now()).count();
+        if (left <= 0) throw std::runtime_error( "Read timeout from socket");
+        pollfd pfd{sock, POLLIN, 0};
+        int ret  = poll(&pfd, 1, (int)left);
+        if (ret < 0)
         {
-        case -1:
-            throw std::runtime_error("Read failed from socket");
-
-        case 0:
-            throw std::runtime_error("Read failed from timeout");
-
-        default:
-            bytesRead = recv(sock, buff, sizeof(buff), 0);
-            break;
+            if (errno = EINTR) continue;
+            throw std::runtime_error("poll failed");
         }
+        if(ret == 0)
+        {
+            throw std::runtime_error("Read timeout form the socket " + std::to_string(sock));
+        }
+        ssize_t r = recv(sock, dst + got, n - got, 0);
+        if (r==0) throw std::runtime_error("Connection closed by peer");
+        if (r<0) { if (errno == EINTR || errno = EAGAIN) continue; throw std::runtime_error("recv failed"); }
+        got += r;
+    }
+}
 
-        // Length indicator must be exactly 4 bytes.
-        if (bytesRead != lenIndSize)
-            return r;
-
-        // Convert received length bytes into message size.
-        std::string messageLenStr;
-        for (char i : buff)
-            messageLenStr += i;
-
-        uint32_t messageLength = bytesToInt(messageLenStr);
-        bufferSize = messageLength;
+std::string receiveData( const int sock, uint32_t bufferSize)
+{
+    if (bufferSize != 0 )
+    {
+        std::string buf(bufferSize, '\0');
+        readExactly(sock, &buf[0], bufferSize, 5000);
+        return buf;
     }
 
-    // Reject invalid message sizes larger than supported limit.
-    if (bufferSize > std::numeric_limits<uint16_t>::max())
-        throw std::runtime_error(
-            "Received corrupted data [Received buffer size greater than 2 ^ 16 - 1]");
+    pollfd pfd {sock, POLLIN, 0};
+    int ret;
+    do{
+        ret = poll(&pfd, 1 ,1000);
+    }while(ret < 0 && errmo = EINTR);
+    if (ret < 0) throw std::runtime_error("Read failed from socket");
+    if (ret == 0) throw ReadTimeout("no data from buffer");
 
-    char buffer[bufferSize];
+    unsigned char hdr[4];
+    readExactly(sock, (char*)hdr, 4, 10000);
+    uint32_t length = (uint32_t)hdr[0] << 24 | (uint32_t)hdr[1] << 16 | (uint32_t)hdr[2] << 8 | hdr[3];
+    if (length == 0) return std::string();
+    if (length > (1u << 20)) throw std::runtime_error("Received corrupted data [message length too large]");
+    std::string msg(length, '\0');
+    readExactly(sock, &msg[0], length, 10000);
+    return msg;
 
-    long bytesRead = 0;
-    long bytesToRead = bufferSize;
-
-    auto startTime = std::chrono::steady_clock::now();
-
-    do
-    {
-        // Abort if overall receive operation exceeds timeout.
-        auto diff = std::chrono::steady_clock::now() - startTime;
-        if (std::chrono::duration<double, std::milli>(diff).count() > TIMEOUT_FOR_READ)
-        {
-            throw std::runtime_error(
-                "Read timeout from socket " + std::to_string(sock));
-        }
-
-        // Read only the remaining bytes still expected.
-        bytesRead = recv(
-            sock,
-            buffer + (bufferSize - bytesToRead),
-            bytesToRead,
-            0);
-
-        if (bytesRead <= 0)
-        {
-            throw std::runtime_error(
-                "Failed to receive data from socket " + std::to_string(sock));
-        }
-
-        bytesToRead -= bytesRead;
-    } while (bytesToRead > 0);
-
-    // Build response string from the fully received buffer.
-    r.assign(buffer, bufferSize);
-
-    return r;
 }

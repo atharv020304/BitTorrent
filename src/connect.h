@@ -17,4 +17,6 @@ void sendData(int sock, const std::string& data);
 /** @brief Reads a length-prefixed BitTorrent message from a socket. */
 std::string receiveData(int sock, uint32_t bufferSize = 0);
 
+class ReadTimeout : public std::runtime_error  { public : using std::runtime_error::runtime_error; };
+
 #endif /*TORRENTCONNECT_H*/
