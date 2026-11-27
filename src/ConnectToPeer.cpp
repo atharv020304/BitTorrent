@@ -17,84 +17,85 @@
 #define HASH_LEN 20
 #define DUMMY_PEER_IP "0.0.0.0"
 
+static std::string makeConnectionKey() { std::atomic<int> n{0};  return "conn-"+std::to_string(++n);} 
+
+
 PeerConnection::PeerConnection(
     SharedQueue<Peer>* queue,
     std::string clientId,
     std::string infoHash,
     PieceManager* pieceManager
-) : queue(queue), clientId(std::move(clientId)), infoHash(infoHash), pieceManager(pieceManager) {}
+) : clientId(std::move(clientId)), infoHash(infoHash),queue(queue), connKey(makeConnectionKey()), pieceManager(pieceManager) {}
 
 void PeerConnection::stop()
 {
     terminated = true;
 }
 
-void PeerConnection::start()
+void PeerConnection::runSession()
 {
-    SPDLOG_INFO("Downloading thread started...");
-    while(!(terminated || pieceManager->isComplete()))
+    using clock = std::chrono::steady_clock;
+    auto lastActivity = clock::now(), lastKeepAlive = clock::now();
+    while(!terminated && !pieceManager->isComplete())
     {
-        peer = queue->pop_front();
-
-        if(peer.ip == DUMMY_PEER_IP)
-            return;
-        
         try
         {
-            if(establishNewConnection()){
-                while(!pieceManager->isComplete())
-                {
-                    TorrentMessage message = receiveMessage();
-                    if (message.getMessageId() > 10)
-                        throw std::runtime_error("invalid msg");
-                    switch(message.getMessageId())
-                    {
-                        case choke:
-                            choked = true;
-                            break;
-
-                        case unchoke:
-                            choked = false;
-                            break;
-                        
-                        case piece:
-                        {
-                            requestPending = false;
-                            std::string payload = message.getPayload();
-                            int index = bytesToInt(payload.substr(0,4));
-                            int begin = bytesToInt(payload.substr(4,4));
-                            std::string blockData = payload.substr(8);
-                            pieceManager->blockReceived(peerId, index, begin, blockData);
-                            break;
-                        }
-                        case have:
-                        {
-                            std::string payload = message.getPayload();
-                            int pieceIndex = bytesToInt(payload);
-                            pieceManager->updatePeer(peerId, pieceIndex);
-                            break;
-                        }
-
-                        default:
-                            break;
-                    }
-
-                    if(!choked)
-                    {
-                        if(!requestPending)
-                        {
-                            requestPiece();
-                        }
-                    }
-                }
-            }
+            TorrentMessage message = receiveMessage();
+            lastActivity = clock::now();
+            handleMessage(message);
         }
-        catch(const std::exception& e)
-        {   
-            closeSock();
-            std::cerr << e.what() << '\n';
+        catch (const ReadTimeout&)
+        {
+            auto now = clock::now();
+            if ( now - lastActivity > std::chrono::seconds(150)) throw std::runtime_error("peer silent for too long");
+            if ( now - lastKeepAlive > std::chrono::seconds(60)) { sendData(sock, std::string(4, '\0')); lastKeepAlive = now; }
         }
-        
+        if(requestPending && clock::now() - lastRequestTime > std::chrono::seconds(30))
+            throw std::runtime_error("peer did not answer a block request in time");
+        if(!choked && !requestPending) requestPiece();
+    }
+}
+
+void PeerConnection::handleMessage(TorrentMessage& message)
+{
+    switch (message.getMessageId())
+    {
+        case  keepAlive: break;
+        case  choke:     choked = true; requestPending = false; break;
+        case unchoke:    choked = false; break;
+        case bitField:   
+                pieceManager->addPeer(connKey, message.getPayload());
+                registerd = true;
+                break;
+        case have:
+        {
+                std::string p = message.getPayload();
+                if (p.size() != 4) throw std::runtime_error("malformed 'have'");
+                pieceManager->updatePeer(connKey, bytesToInt(p));
+                break;
+        }  
+        case piece:
+        {
+                std::string p = message.getPayload();
+                if (p.size() < 8) throw std::runtime_error("malformed 'piece");
+                requestPending = false;
+                pieceManager->blockReceived( connKey, bytesToInt(p.substr(0, 4)), bytesToInt(p.substr(4,4)), p.substr(8));
+                break;
+        }
+        default : break;
+    }
+}
+
+void PeerConnection::start()
+{
+    while(!(terminated || pieceManager->isComplete()))
+    {
+        Peer next = queue->pop_front();
+        if (next.ip == DUMMY_PEER_IP) return;
+        peer = next;
+        try { if(establishNewConnection()) runSession(); }
+        catch (const std::exception& e) { SPDLOG_INFO("Connection to peer [{}:{}] ended: {}", peer.ip, peer.port,e.what()); }
+        closeSock();
     }
 }
 

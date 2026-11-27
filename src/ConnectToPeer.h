@@ -10,6 +10,8 @@
 #include "TorrentMessage.h"
 #include "PieceManager.h"
 #include "SharedQueue.h"
+#include <atomic>
+#include <chrono>
 
 
 /**
@@ -22,25 +24,27 @@
 class PeerConnection
 {
     private:    
-        int sock{};
+        int sock = -1;
         bool choked = true;
         bool requestPending = false;
-        bool terminated = false;
+        std::atomic<bool> terminated{false};
         const std::string clientId;
         const std::string infoHash;
         SharedQueue<Peer>* queue;
         Peer peer;
-        std::string peerBitField;
+        bool registerd = false;
         std::string peerId;
         PieceManager* pieceManager;
+        std::chrono::steady_clock::time_point lastRequestTime;
+        const std::string connKey;
 
         std::string createHandshakeMessage();
         void performHandshake();
-        void receiveBitField();
         void sendInterested();
-        void receiveUnchoke();
         void requestPiece();
         void closeSock();
+        void runSession();
+        void handleMessage(TorrentMessage& message);
         bool establishNewConnection();
         TorrentMessage receiveMessage(int bufferSize = 0);
     
