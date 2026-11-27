@@ -85,12 +85,12 @@ void TorrentClient::downloadFile(const std::string& torrentFilePath, const std::
         if (lastPeerQuery == -1 || diff >= PEER_QUERY_INTERVAL || queue.empty())
         {
             PeerRetriever peerRetriever(peerId, announceUrl, infoHash, PORT, fileSize);
-            std::vector<Peer*> peers = peerRetriever.retrievePeers(pieceManager.bytesDownloaded());
+            std::vector<Peer> peers = peerRetriever.retrievePeers(pieceManager.bytesDownloaded());
             lastPeerQuery = currentTime;
             if (!peers.empty())
             {
                 queue.clear();
-                for (auto peer : peers)
+                for (const Peer& peer : peers)
                     queue.push_back(peer);
 
             }

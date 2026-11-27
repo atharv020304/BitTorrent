@@ -10,10 +10,7 @@
 #include <mutex>
 #include <condition_variable>
 
-/**
- * Implementation of a thread-safe Queue. Code from
- * https://stackoverflow.com/questions/36762248/why-is-stdqueue-not-thread-safe
- */
+
 template <typename T>
 class SharedQueue
 {
@@ -21,8 +18,8 @@ public:
     SharedQueue();
     ~SharedQueue();
 
-    T& front();
-    T& pop_front();
+    T front();
+    T pop_front();
 
     void push_back(const T& item);
     void push_back(T&& item);
@@ -47,10 +44,7 @@ template <typename T>
 T& SharedQueue<T>::front()
 {
     std::unique_lock<std::mutex> mlock(mutex_);
-    while (queue_.empty())
-    {
-        cond_.wait(mlock);
-    }
+    cond_.wait(mlock, [this]{ return !queue_.empty(); });
     return queue_.front();
 }
 
@@ -58,13 +52,10 @@ template <typename T>
 T& SharedQueue<T>::pop_front()
 {
     std::unique_lock<std::mutex> mlock(mutex_);
-    while (queue_.empty())
-    {
-        cond_.wait(mlock);
-    }
-    T& front = queue_.front();
+    cond_.wait(mlock, [this]{ return !queue_.empty(); });
+    T item = std::move(queue_.front());
     queue_.pop_front();
-    return front;
+    return item;
 }
 
 template <typename T>

@@ -28,7 +28,7 @@ class TorrentClient
     private:
         const int threadNum;
         std::string peerId;
-        SharedQueue<Peer*> queue;
+        SharedQueue<Peer> queue;
         std::vector<std::thread> threadPool;
         std::vector<PeerConnection*> connections;
         std::shared_ptr<spdlog::logger> logger;

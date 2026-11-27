@@ -29,7 +29,7 @@ PeerRetriever::PeerRetriever(
 {
 }
 
-std::vector<Peer*> PeerRetriever::retrievePeers(unsigned long bytesDnld)
+std::vector<Peer> PeerRetriever::retrievePeers(unsigned long bytesDnld)
 {
     std::stringstream info;
     info << "Retrieving peers from " << announceUrl << " with following params... " << std::endl;
@@ -55,18 +55,18 @@ std::vector<Peer*> PeerRetriever::retrievePeers(unsigned long bytesDnld)
     if(res.status_code == 200)
     {
         SPDLOG_INFO("Retrieve response from tracker: SUCCESS");
-        std::vector<Peer*> peers = decodeResp(res.text);
+        std::vector<Peer> peers = decodeResp(res.text);
         return peers;
 
     }else
     {
         SPDLOG_INFO("ERROR response from tracker");
     }
-    return std::vector<Peer*> ();
+    return std::vector<Peer> ();
 }
 
 
-std::vector<Peer*> PeerRetriever::decodeResp(std::string response) {
+std::vector<Peer> PeerRetriever::decodeResp(std::string response) {
     SPDLOG_INFO("Decoding tracker response");
     std::shared_ptr<bencoding::BItem> dResp = bencoding::decode(response);
 
@@ -77,7 +77,7 @@ std::vector<Peer*> PeerRetriever::decodeResp(std::string response) {
     if(!peersValue)
         throw std::runtime_error("Received malformed 'peers' from tracker. [Missing 'peers' key]");
 
-    std::vector<Peer*> peers;
+    std::vector<Peer> peers;
 
     // case 1 : peer info is in binary blob
     if(typeid(*peersValue) == typeid(bencoding::BString))
@@ -101,8 +101,7 @@ std::vector<Peer*> PeerRetriever::decodeResp(std::string response) {
             peerIp << std::to_string((uint8_t) peerString[offset + 3]);
             int peerPort = bytesToInt(peerString.substr(offset+4, 2));
 
-            Peer* newPeer = new Peer { peerIp.str() , peerPort};
-            peers.push_back(newPeer);
+            peers.push_back(Peer { peerIp.str() , peerPort});
         }
     }
     // case 2 : peer info is in List format
@@ -124,8 +123,7 @@ std::vector<Peer*> PeerRetriever::decodeResp(std::string response) {
                 throw std::runtime_error("Received malformed 'peers' from tracker. [Item does not contain key 'port']");
             
             int peerPort = (int) std::dynamic_pointer_cast<bencoding::BInteger>(tempPeerPort)->value();
-            Peer* newPeer = new Peer { peerIp, peerPort };
-            peers.push_back(newPeer);
+            peers.push_back(Peer { peerIp, peerPort });
         }
     }
     else

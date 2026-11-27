@@ -28,8 +28,8 @@ class PeerConnection
         bool terminated = false;
         const std::string clientId;
         const std::string infoHash;
-        SharedQueue<Peer*>* queue;
-        Peer* peer;
+        SharedQueue<Peer>* queue;
+        Peer peer;
         std::string peerBitField;
         std::string peerId;
         PieceManager* pieceManager;
@@ -46,7 +46,7 @@ class PeerConnection
     
     public:
         const std::string &getPeerId() const;
-        explicit PeerConnection(SharedQueue<Peer*>* queue, std::string clientId, std::string infoHash, PieceManager* pieceManager);
+        explicit PeerConnection(SharedQueue<Peer>* queue, std::string clientId, std::string infoHash, PieceManager* pieceManager);
         void start();
         void stop();
 };

@@ -34,10 +34,10 @@ class PeerRetriever
 
         int port;
         const unsigned long fileSize;
-        std::vector<Peer*> decodeResp(std::string response);
+        std::vector<Peer> decodeResp(std::string response);
     public:
         explicit PeerRetriever(std::string peerId, std::string announceUrl, std::string infoHash, int port, unsigned long fileSize);
-        std::vector<Peer*> retrievePeers(unsigned long bytesDnld = 0);
+        std::vector<Peer> retrievePeers(unsigned long bytesDnld = 0);
 };
 
 #endif /*TORRENT_PEER_RETRIVER_H*/
