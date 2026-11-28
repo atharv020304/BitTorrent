@@ -47,7 +47,6 @@ std::vector<Peer> PeerRetriever::retrievePeers(unsigned long bytesDnld)
     return decodeResp(res.text);
 }
 
-
 std::vector<Peer> PeerRetriever::decodeResp(std::string response) {
     SPDLOG_INFO("Decoding tracker response");
     std::shared_ptr<bencoding::BItem> dResp = bencoding::decode(response);

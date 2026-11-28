@@ -17,9 +17,9 @@ TorrentFileParser::TorrentFileParser(const std::string& path)
 {
     SPDLOG_INFO("Parsing Torrent File %s...",path.c_str());
     std::ifstream fileStream(path, std::ifstream::binary);
-    std::shared_ptr<bencoding::BItem> decodedTorrentFile = bencoding::decode(fileStream);
-    std::shared_ptr<bencoding::BDictionary> rootDict = std::dynamic_pointer_cast<bencoding::BDictionary>(decodedTorrentFile);
-    root = rootDict;
+    if (!fileStream.is_open()) throw std::runtime_error("Cannot open torrent file '" + path + "'");
+    root = std::dynamic_pointer_cast<bencoding::BDictionary> (bencoding::decode(fileStream));
+    if(!root) throw std::runtime_error("Not a valid torrent file");
     SPDLOG_INFO("Parsing Successful");
 }
 
@@ -27,13 +27,15 @@ std::shared_ptr<bencoding::BItem> TorrentFileParser::get(std::string key) const 
     std::shared_ptr<bencoding::BItem> infoDict = root->getValue("info");
     if (!infoDict)
         throw std::runtime_error("Torrent file is malformed. [File does not contain key 'info']");
-    std::shared_ptr<bencoding::BDictionary> info = std::dynamic_pointer_cast<bencoding::BDictionary>(infoDict);
+    auto info = std::dynamic_pointer_cast<bencoding::BDictionary>(infoDict);
+    if(!info) throw std::runtime_error("torrent file is malformed.");
     std::shared_ptr<bencoding::BItem> value = info->getValue(key);
     return value;
 }
 
 std::string TorrentFileParser::getInfoHash() const{
     std::shared_ptr<bencoding::BItem> infoDict = root->getValue("info");
+    if(!infoDict) throw std::runtime_error("torrent file is malformed");
     std::string infoString = bencoding::encode(infoDict);
     std::string sha1Hash = sha1(infoString);
     return sha1Hash;
@@ -42,11 +44,10 @@ std::string TorrentFileParser::getInfoHash() const{
 std::vector<std::string> TorrentFileParser::splitPieceHashes() const
 {
     std::shared_ptr<bencoding::BItem> piecesValue = get("pieces");
-    if(!piecesValue)
-    {
-        throw std::runtime_error("Malformed Torrent File");
-    }
-    std::string pieces = std::dynamic_pointer_cast<bencoding::BString>(piecesValue)->value();
+    auto ps = std::dynamic_pointer_cast<bencoding::BString>(piecesValue);
+    if (!ps) throw std::runtime_error("Malformed Torrent File");
+    std::string pieces = ps->value();
+    if(pieces.size() % HASH_LEN != 0 ) throw std::runtime_error("Malformed Torrent file");
 
     std::vector<std::string> pieceHashes;
 
@@ -61,6 +62,7 @@ std::vector<std::string> TorrentFileParser::splitPieceHashes() const
 }
 
 long TorrentFileParser::getFileSize() const{
+    if(get("files")) throw std::runtime_error("Multi-File torrents are not supported");
     std::shared_ptr<bencoding::BItem> fileSizeItem = get("length");
     if(!fileSizeItem)
         throw std::runtime_error("Torrent File is Malformed");
