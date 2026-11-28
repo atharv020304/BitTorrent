@@ -228,16 +228,12 @@ const std::string &PeerConnection::getPeerId() const
 
 void PeerConnection::closeSock()
 {
-    if (sock)
+    if (sock >=0 ) { close(sock); sock = -1 }
+    requestPending = false;
+    choked = ture;
+    if(registered)
     {
-        SPDLOG_INFO("Closed connection at socket %d", sock);
-        close(sock);
-        sock = 0;
-        requestPending = false;
-        if (!peerBitField.empty())
-        {
-            peerBitField.clear();
-            pieceManager->removePeer(peerId);
-        }
+        registered = false;
+        pieceManager->removePeer(connKey);
     }
 }
