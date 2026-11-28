@@ -32,7 +32,7 @@ class PeerConnection
         const std::string infoHash;
         SharedQueue<Peer>* queue;
         Peer peer;
-        bool registerd = false;
+        bool registered = false;
         std::string peerId;
         PieceManager* pieceManager;
         std::chrono::steady_clock::time_point lastRequestTime;
