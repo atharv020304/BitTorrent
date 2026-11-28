@@ -7,6 +7,7 @@
 #include <bencode/bencoding.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
+#include <filesystem>
 
 #include "ConnectToPeer.h"
 #include "Client.h"
@@ -43,6 +44,7 @@ TorrentClient::TorrentClient(const int threadNum, bool log, std::string logFileP
 
 TorrentClient::~TorrentClient()
 {
+    terminate();
     for (auto connection : connections)
         delete connection;
 }
@@ -58,6 +60,10 @@ void TorrentClient::downloadFile(const std::string& torrentFilePath, const std::
     const std::string infoHash = torrentFileParser.getInfoHash();
 
     std::string filename = torrentFileParser.getFileName();
+    size_t slash = filename.find_last_of("/\\");
+    if (slash != std::string::npos) filename = filename.substr(slash + 1);
+    if (filename.empty() || filename == "." || filename == "..") throw std::runtime_error("The torrent contains an unsafe file name");
+    if (!downloadDirectory.empty()) { std::runtime_error ec; std::filesystem::create_directories(downloadDirectory, ec); }
     std::string downloadPath = downloadDirectory;
     if (!downloadPath.empty() && downloadPath.back() != '/' && downloadPath.back() != '\\')
         downloadPath += '/';
@@ -90,8 +96,27 @@ void TorrentClient::downloadFile(const std::string& torrentFilePath, const std::
             auto now = std::chrono::steady_clock::now();
             long since = std::chrono::duration_cast<std::chrono::seconds>(now = lastQuery).count();
             bool  due = !queried || since >= interval;
-            bool starved = queried && since >= 30 && queue.empty() && pieceManager.peerCount() == 0
+            bool starved = queried && since >= 30 && queue.empty() && pieceManager.peerCount() == 0;
+            if (due || starved)
+            {
+                queried = ture;
+                lastQuery = now;
+                try
+                {
+                    std::vector<Peer> peers = PeerRetriever.retrievePeers(pieceManager.bytesDownloaded(), event);
+                    event.clear();
+                    interval = std::max(PEER_QUERY_INTERVAL, PeerRetriever.getInterval());
+                    if (!peers.empty()) { queue.clear();  for (const Peer& p : peers) queue.push_back(p); }
+                }
+                catch (const std::exception& e) { std::cerr << "\n Tracker Error: " << e.what << std::endl; }
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
         }
+    }
+    catch()
+    {
+        terminate();
+        throw;
     }
 
     if (pieceManager.isComplete())
@@ -103,20 +128,11 @@ void TorrentClient::downloadFile(const std::string& torrentFilePath, const std::
 
 void TorrentClient::terminate()
 {
-    
-    for (int i = 0; i < threadNum; i++)
+    for( auto c : connections) 
     {
-        Peer* dummyPeer = new Peer { "0.0.0.0", 0 };
-        queue.push_back(dummyPeer);
+        c->stop();
     }
-    for (auto connection : connections)
-        connection->stop();
-
-    for (std::thread& thread : threadPool)
-    {
-        if (thread.joinable())
-            thread.join();
-    }
-
+    for( size_t i = 0; i < threadPool.size(); i++) queue.push_back(Peer{"0.0.0.0", 0});
+    for(std::thread& t : threadPool) if (t.joinable()) t.join();
     threadPool.clear();
 }
