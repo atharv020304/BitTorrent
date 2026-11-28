@@ -389,3 +389,8 @@ void PieceManager::displayProgressBar()
     if (complete) std::cout << std::endl;
 
 }
+
+int PieceManager::peerCount()
+{
+    return peers.size(); 
+}

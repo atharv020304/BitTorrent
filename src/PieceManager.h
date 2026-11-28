@@ -52,6 +52,7 @@ private:
     bool write(Piece *piece);
     void displayProgressBar();
     void trackProgress();
+    int peerCount();
 
 public:
     explicit PieceManager(const TorrentFileParser &fileParser, const std::string &downloadPath, int maxConnections);

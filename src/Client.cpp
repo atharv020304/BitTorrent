@@ -2,6 +2,8 @@
 #include <random>
 #include <thread>
 #include <ctime>
+#include <chrono>
+#include <algorithm>
 #include <bencode/bencoding.h>
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
@@ -74,30 +76,23 @@ void TorrentClient::downloadFile(const std::string& torrentFilePath, const std::
 
     std::cout << "Download initiated..." << std::endl;
 
-    while (true)
+    try
     {
-        if (pieceManager.isComplete())
-            break;
+        PeerRetriever PeerRetriever(peerId, announceUrl, infoHash, PORT, fileSize);
+        auto lastQuery = std::chrono::steady_clock::now();
+        bool queried = false;
+        std::string event = "started";
+        int interval = PEER_QUERY_INTERVAL;
 
-        time_t currentTime = std::time(nullptr);
-        auto diff = std::difftime(currentTime, lastPeerQuery);
-       
-        if (lastPeerQuery == -1 || diff >= PEER_QUERY_INTERVAL || queue.empty())
+        while(!pieceManager.isComplete())
         {
-            PeerRetriever peerRetriever(peerId, announceUrl, infoHash, PORT, fileSize);
-            std::vector<Peer> peers = peerRetriever.retrievePeers(pieceManager.bytesDownloaded());
-            lastPeerQuery = currentTime;
-            if (!peers.empty())
-            {
-                queue.clear();
-                for (const Peer& peer : peers)
-                    queue.push_back(peer);
-
-            }
+            if(pieceManager.failed()) throw std::runtime_error("could not write the downloaded data to disk");
+            auto now = std::chrono::steady_clock::now();
+            long since = std::chrono::duration_cast<std::chrono::seconds>(now = lastQuery).count();
+            bool  due = !queried || since >= interval;
+            bool starved = queried && since >= 30 && queue.empty() && pieceManager.peerCount() == 0
         }
     }
-
-    terminate();
 
     if (pieceManager.isComplete())
     {
