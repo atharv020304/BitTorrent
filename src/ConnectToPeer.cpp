@@ -101,14 +101,7 @@ void PeerConnection::start()
 
 void PeerConnection::performHandshake()
 {
-    try
-    {
-        sock  = createConnection(peer.ip, peer.port);
-    }
-    catch (std::runtime_error &e)
-    {
-        throw std::runtime_error("Cannot connect to a peer");
-    }
+    sock  = createConnection(peer.ip, peer.port);
     SPDLOG_INFO("Established TCP connection with peer at socket %d: successfully", sock);
 
     SPDLOG_INFO("Sending Handshake msg to %s ...", peer.ip.c_str());
@@ -130,36 +123,12 @@ void PeerConnection::performHandshake()
 
 }
 
-void PeerConnection::receiveBitField()
-{
-    SPDLOG_INFO("Receiving BitField message from peer %s", peer.ip.c_str());
-    TorrentMessage msg = receiveMessage();
-    if(msg.getMessageId() != bitField)
-        throw std::runtime_error("failed to receive the correct bitfield");
-    peerBitField = msg.getPayload();
-
-    pieceManager->addPeer(peerId, peerBitField);
-
-    SPDLOG_INFO("Receive BitField Successfull");
-}
-
 void PeerConnection::sendInterested()
 {
     SPDLOG_INFO("Sending Interested message to peer [%s]...", peer.ip.c_str());
     std::string interestedMessage = TorrentMessage(interested).toString();
     sendData(sock, interestedMessage);
     SPDLOG_INFO("Send Interested message: SUCCESS");
-}
-
-void PeerConnection::receiveUnchoke() {
-    SPDLOG_INFO("Receiving Unchoke message from peer [%s]...", peer.ip.c_str());
-    TorrentMessage message = receiveMessage();
-    if (message.getMessageId() != unchoke)
-        throw std::runtime_error(
-                "Receive Unchoke message from peer: FAILED [Wrong message ID: " +
-                std::to_string(message.getMessageId()) + "]");
-    choked = false;
-    SPDLOG_INFO("Receive Unchoke message: SUCCESS");
 }
 
 void PeerConnection::requestPiece() 
