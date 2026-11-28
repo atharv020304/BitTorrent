@@ -31,38 +31,20 @@ PeerRetriever::PeerRetriever(
 
 std::vector<Peer> PeerRetriever::retrievePeers(unsigned long bytesDnld)
 {
-    std::stringstream info;
-    info << "Retrieving peers from " << announceUrl << " with following params... " << std::endl;
-    info << "peer_id: "<< peerId << std::endl;
-    info << "port: " << port << std::endl;
-    info << "uploaded: " << 0 << std::endl;
-    info << "downloaded: " << std::to_string(bytesDnld) << std::endl;
-    info << "left :" << std::to_string(fileSize - bytesDnld) << std::endl;
-    info << "compact: " << std::to_string(1);
-    
-    SPDLOG_INFO("%s", info.str().c_str());
+    const unsigned long left = fileSize > bytesDnld ? fileSize - bytesDnld : 0;
+    SPDLOG_INFO("Retrieving peers from {} (downloaded {}, left{})", announceUrl, bytesDnld, left);
 
-    cpr::Response res = cpr::Get(cpr::Url{announceUrl}, cpr::Parameters{
-        { "info_hash", std::string(hexDecode(infoHash))},
-        { "peer_id", std::string(peerId) },
-        { "port", std::to_string(port) },
-        { "uploaded", std::to_string(0) },
-        { "downloaded", std::to_string(bytesDnld)},
-        { "left", std::to_string(fileSize - bytesDnld)},
-        { "compact", std::to_string(1) }
-    }, cpr::Timeout{ TRACKER_TIMEOUT });
+    cpr::Parameters params{
+        { "info_hash", std::string(hexDecode(infoHash)) }, {"peer_id", peerId}, {"port", std::to_string(port) },
+        { "uploaded", "0" }, { "downloaded", std::to_string(bytesDnld) }, { "left", std::to_string(left) }, {"compact", "1"} 
+    };
 
-    if(res.status_code == 200)
-    {
-        SPDLOG_INFO("Retrieve response from tracker: SUCCESS");
-        std::vector<Peer> peers = decodeResp(res.text);
-        return peers;
+    if(!event.empty()) params.Add(cpr::Parameter{ "event", event });
 
-    }else
-    {
-        SPDLOG_INFO("ERROR response from tracker");
-    }
-    return std::vector<Peer> ();
+    cpr::Response res = cpr::Get(cpr::Url{announceUrl}, params, cpr::Timeout{ TRACKER_TIMEOUT });
+    if(res.error)       throw std::runtime_error("Tracker request failed: " + res.error.message);
+    if(res.status_code != 200) throw std::runtime_error("Tracker responded with HTTP status "+ std::to_string(res.status_code));
+    return decodeResp(res.text);
 }
 
 
